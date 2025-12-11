@@ -31,15 +31,45 @@
                 $('#' + target).addClass('active');
                 localStorage.setItem('pcn_active_tab', target);
 
-                // 切换到模板标签页时刷新 TinyMCE，防止编辑器在隐藏状态下初始化导致的高度异常
-                if (target === 'tab-templates' && typeof tinymce !== 'undefined') {
-                    ['tpl_reply', 'tpl_new_comment', 'tpl_pending'].forEach(function(id) {
-                        var editor = tinymce.get(id);
-                        if (editor && !editor.isHidden()) {
-                            // 触发一次重绘
-                            editor.fire('ResizeEditor');
+                // 切换到模板标签页时按需初始化 TinyMCE，避免在后台初始化时影响性能
+                if (target === 'tab-templates') {
+                    if (! window.pcnEditorsInitialized) {
+                        // Prefer WP editor initializer when available
+                        if (typeof wp !== 'undefined' && wp.editor && typeof wp.editor.initialize === 'function') {
+                            ['tpl_reply', 'tpl_new_comment', 'tpl_pending'].forEach(function(id) {
+                                if (document.getElementById(id)) {
+                                    try {
+                                        wp.editor.initialize(id, { tinymce: true, quicktags: false, mediaButtons: false });
+                                    } catch (e) {
+                                        // ignore init failures
+                                    }
+                                }
+                            });
+                        } else if (typeof tinymce !== 'undefined') {
+                            // Fallback: initialize editors via tinymce on the textareas
+                            ['tpl_reply', 'tpl_new_comment', 'tpl_pending'].forEach(function(id) {
+                                var ta = document.getElementById(id);
+                                if (ta && ! tinymce.get(id)) {
+                                    try {
+                                        tinymce.init({ selector: '#' + id, menubar: false });
+                                    } catch (e) {
+                                        // ignore
+                                    }
+                                }
+                            });
                         }
-                    });
+                        window.pcnEditorsInitialized = true;
+                    } else {
+                        // 已初始化的编辑器触发重绘，防止渲染高度异常
+                        if (typeof tinymce !== 'undefined') {
+                            ['tpl_reply', 'tpl_new_comment', 'tpl_pending'].forEach(function(id) {
+                                var editor = tinymce.get(id);
+                                if (editor && !editor.isHidden()) {
+                                    editor.fire('ResizeEditor');
+                                }
+                            });
+                        }
+                    }
                 }
             });
             var activeTab = localStorage.getItem('pcn_active_tab');
@@ -200,15 +230,15 @@
         <p><?php _e('编辑 HTML 模板。系统会尝试将更改写入插件的 `templates/` 目录（需可写）。如果写入失败，模板会保存到数据库选项 `pcn_templates`。', 'wp-comment-notify'); ?></p>
         <h3><?php _e('回复通知模板 (reply)', 'wp-comment-notify'); ?></h3>
         <p class="description"><?php _e('可用变量：{{blogname}}, {{parent_author}}, {{parent_content}}, {{reply_author}}, {{reply_content}}, {{comment_link}}, {{unsubscribe_url}}', 'wp-comment-notify'); ?></p>
-        <?php wp_editor($tpls['reply'] ?? '', 'tpl_reply', array('textarea_name' => 'tpl_reply', 'textarea_rows' => 15, 'media_buttons' => false, 'tinymce' => true)); ?>
+        <?php wp_editor($tpls['reply'] ?? '', 'tpl_reply', array('textarea_name' => 'tpl_reply', 'textarea_rows' => 15, 'media_buttons' => false, 'tinymce' => false)); ?>
 
         <h3><?php _e('管理员新评论通知模板 (new_comment)', 'wp-comment-notify'); ?></h3>
         <p class="description"><?php _e('可用变量：{{author}}, {{content}}, {{post_title}}, {{comment_id}}, {{comments_waiting}}, {{approve_url}}, {{trash_url}}, {{spam_url}}', 'wp-comment-notify'); ?></p>
-        <?php wp_editor($tpls['new_comment'] ?? '', 'tpl_new_comment', array('textarea_name' => 'tpl_new_comment', 'textarea_rows' => 15, 'media_buttons' => false, 'tinymce' => true)); ?>
+        <?php wp_editor($tpls['new_comment'] ?? '', 'tpl_new_comment', array('textarea_name' => 'tpl_new_comment', 'textarea_rows' => 15, 'media_buttons' => false, 'tinymce' => false)); ?>
 
         <h3><?php _e('待审核通知模板 (pending)', 'wp-comment-notify'); ?></h3>
         <p class="description"><?php _e('可用变量：{{author}}, {{content}}, {{post_title}}, {{comment_id}}, {{comments_waiting}}, {{approve_url}}, {{trash_url}}, {{spam_url}}', 'wp-comment-notify'); ?></p>
-        <?php wp_editor($tpls['pending'] ?? '', 'tpl_pending', array('textarea_name' => 'tpl_pending', 'textarea_rows' => 15, 'media_buttons' => false, 'tinymce' => true)); ?>
+        <?php wp_editor($tpls['pending'] ?? '', 'tpl_pending', array('textarea_name' => 'tpl_pending', 'textarea_rows' => 15, 'media_buttons' => false, 'tinymce' => false)); ?>
         
         </div> <!-- End tab-templates -->
 

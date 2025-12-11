@@ -58,6 +58,11 @@ class PCN_Settings {
 
         $debug_logs = get_option('pcn_debug_log', array());
 
+        // Enqueue editor scripts so we can initialize TinyMCE on-demand in the view
+        if (is_admin()) {
+            wp_enqueue_editor();
+        }
+
         // Include view
         include PCN_PLUGIN_DIR . 'includes/views/settings-page.php';
     }
