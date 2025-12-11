@@ -47,9 +47,10 @@
 
 ## 安装与激活
 
-1.  将 `wp-comment-notify` 整个文件夹上传到 WordPress 站点的 `/wp-content/plugins/` 目录下。
-2.  登录 WordPress 后台，进入“插件”页面。
-3.  找到“WP Comment Notify (Simple)”并点击“激活”。
+1.  前往 [Releases](https://github.com/YanQS-Blog/WordPress-Comment-Reply-Notify-Plugin/releases) 下载最新版本。
+2.  将整个文件夹上传到 WordPress 站点的 `/wp-content/plugins/` 目录下。
+3.  登录 WordPress 后台，进入“插件”页面。
+4.  找到“WP Comment & Reply Notify”并点击“激活”。
 
 ## 配置指南
 
