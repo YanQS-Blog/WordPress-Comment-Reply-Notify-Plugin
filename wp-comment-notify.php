@@ -3,7 +3,7 @@
  * Plugin Name: WP Comment & Reply Notify
  * Plugin URI:  https://yanqs.me/wp-comment-notify-plugin/
  * Description: 在评论发布时发送上级用户回复通知邮件&管理员通知邮件（包含安全与 HTML 发送的改良实现）。
- * Version:     1.0.0
+ * Version:     2.0.0
  * Author:      YanQS
  * Author URI:  https://yanqs.me/
  * License:     GPL2
