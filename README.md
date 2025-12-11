@@ -52,6 +52,11 @@
 3.  登录 WordPress 后台，进入“插件”页面。
 4.  找到“WP Comment & Reply Notify”并点击“激活”。
 
+## 凭据与安全建议
+
+- 为安全起见，强烈建议通过环境变量或你站点的 secret 管理器提供 SMTP 凭据（例如在 `wp-config.php` 中定义 `PCN_SMTP_PASSWORD`、`PCN_SMTP_CLIENT_SECRET`、`PCN_SMTP_REFRESH_TOKEN`），而不是在后台保存明文。插件后台仍然提供凭据保存功能，但会以加密形式存储并且不回显。 
+- 在设置页面中你也可以使用 “清除凭据” 按钮立即移除插件保存的敏感字段。
+
 ## 配置指南
 
 激活后，请在后台左侧菜单中找到 **设置 > WP Comment Notify**，进入插件的配置页面。

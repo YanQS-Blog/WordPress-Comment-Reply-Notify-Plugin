@@ -79,6 +79,16 @@ class PCN_Settings {
             self::save_settings();
         }
         
+        // Clear stored sensitive credentials
+        if (isset($_POST['pcn_clear_credentials']) && check_admin_referer('pcn_clear_credentials')) {
+            $settings = get_option('pcn_smtp_settings', array());
+            $settings['password'] = '';
+            $settings['client_secret'] = '';
+            $settings['refresh_token'] = '';
+            update_option('pcn_smtp_settings', $settings);
+            echo '<div class="updated"><p>' . __('已清除敏感凭据（后台已不再回显）。建议使用环境变量提供凭据。', 'wp-comment-notify') . '</p></div>';
+        }
+        
         if (isset($_POST['pcn_clear_logs']) && check_admin_referer('pcn_show_logs')) {
             delete_option('pcn_email_logs');
             echo '<div class="updated"><p>' . __('已清空邮件发送日志。', 'wp-comment-notify') . '</p></div>';

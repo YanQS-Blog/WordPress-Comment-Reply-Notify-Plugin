@@ -54,6 +54,10 @@ Plugin Homepage: [https://yanqs.me/wp-comment-notify-plugin/](https://yanqs.me/w
 3.  Log in to the WordPress admin panel and go to the "Plugins" page.
 4.  Find "WP Comment & Reply Notify" and click "Activate".
 
+## Credentials & Security Recommendations
+
+- It's strongly recommended to supply SMTP credentials via environment variables or your hosting secret manager. You can define constants in `wp-config.php` such as `PCN_SMTP_PASSWORD`, `PCN_SMTP_CLIENT_SECRET`, and `PCN_SMTP_REFRESH_TOKEN`. The admin UI will not echo back sensitive values; when needed you can use the "Clear Credentials" button to remove stored values.
+
 ## Configuration Guide
 
 After activation, please find **Settings > WP Comment Notify** in the left menu of the admin panel to enter the plugin configuration page.

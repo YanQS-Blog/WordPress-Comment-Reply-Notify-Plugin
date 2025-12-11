@@ -244,6 +244,9 @@
 
         <div class="pcn-submit-bar">
             <input type="submit" name="pcn_save_settings" id="submit" class="button button-primary button-hero" value="<?php esc_attr_e('保存所有设置', 'wp-comment-notify'); ?>" />
+            &nbsp;
+            <button type="submit" name="pcn_clear_credentials" class="button" onclick="return confirm('<?php esc_js_e('确定要清除所有已保存的敏感凭据吗？推荐通过环境变量提供凭据。', 'wp-comment-notify'); ?>');"><?php esc_html_e('清除凭据', 'wp-comment-notify'); ?></button>
+            <?php wp_nonce_field('pcn_clear_credentials'); ?>
         </div>
     </form>
 
