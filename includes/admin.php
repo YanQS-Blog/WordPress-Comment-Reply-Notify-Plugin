@@ -267,18 +267,76 @@ function pcn_options_page() {
     }
 
     ?>
-    <div class="wrap">
-        <h1>WP Comment Notify 设置</h1>
-        <p>
-            插件主页：
-            <a href="https://yanqs.me/wp-comment-notify-plugin/" target="_blank" rel="noopener noreferrer">
-                https://yanqs.me/wp-comment-notify-plugin/
-            </a>
-        </p>
+    <div class="wrap pcn-wrap">
+        <style>
+            .pcn-wrap { max-width: 1000px; margin: 20px 0; background: #fff; padding: 30px; box-shadow: 0 1px 3px rgba(0,0,0,0.1); border-radius: 4px; box-sizing: border-box; }
+            .pcn-header { border-bottom: 1px solid #eee; padding-bottom: 20px; margin-bottom: 20px; display: flex; justify-content: space-between; align-items: center; }
+            .pcn-header h1 { margin: 0; padding: 0; font-size: 24px; }
+            .pcn-nav-tab-wrapper { border-bottom: 1px solid #c3c4c7; margin-bottom: 20px; padding: 0; }
+            .pcn-nav-tab { display: inline-block; padding: 10px 15px; text-decoration: none; color: #2271b1; border: 1px solid transparent; border-bottom: none; margin-bottom: -1px; cursor: pointer; font-weight: 600; font-size: 14px; margin-right: 5px; background: #e5e5e5; border-color: #c3c4c7; }
+            .pcn-nav-tab:hover { background: #f0f0f1; color: #0a4b78; }
+            .pcn-nav-tab.active { border: 1px solid #c3c4c7; border-bottom-color: #fff; color: #000; background: #fff; }
+            .pcn-tab-content { display: none; animation: fadeIn 0.3s; }
+            .pcn-tab-content.active { display: block; }
+            @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
+            .form-table th { width: 220px; font-weight: 600; }
+            .pcn-card { background: #fff; border: 1px solid #c3c4c7; padding: 20px; margin-bottom: 20px; border-radius: 0; box-shadow: none; }
+            .pcn-card h3 { margin-top: 0; border-bottom: 1px solid #eee; padding-bottom: 10px; margin-bottom: 15px; color: #23282d; }
+            .pcn-submit-bar { margin-top: 30px; padding-top: 20px; border-top: 1px solid #eee; }
+            .pcn-status-badge { display: inline-block; padding: 4px 8px; border-radius: 4px; font-size: 12px; font-weight: bold; }
+            .pcn-status-valid { background: #d1e7dd; color: #0f5132; }
+            .pcn-status-invalid { background: #f8d7da; color: #842029; }
+            .pcn-status-warning { background: #fff3cd; color: #664d03; }
+        </style>
+        <script>
+            jQuery(document).ready(function($) {
+                $('.pcn-nav-tab').click(function(e) {
+                    e.preventDefault();
+                    var target = $(this).data('target');
+                    $('.pcn-nav-tab').removeClass('active');
+                    $(this).addClass('active');
+                    $('.pcn-tab-content').removeClass('active');
+                    $('#' + target).addClass('active');
+                    localStorage.setItem('pcn_active_tab', target);
+                });
+                var activeTab = localStorage.getItem('pcn_active_tab');
+                if (activeTab && $('#' + activeTab).length) {
+                    $('.pcn-nav-tab[data-target="' + activeTab + '"]').click();
+                } else {
+                    $('.pcn-nav-tab:first').click();
+                }
+
+                // 认证类型切换逻辑
+                $('#pcn-auth-type-select').change(function() {
+                    var type = $(this).val();
+                    if (type === 'oauth2') {
+                        $('.pcn-auth-login').hide();
+                        $('.pcn-auth-oauth2').show();
+                    } else {
+                        $('.pcn-auth-login').show();
+                        $('.pcn-auth-oauth2').hide();
+                    }
+                }).change(); // 初始化触发
+            });
+        </script>
+
+        <div class="pcn-header">
+            <h1>WP Comment & Reply Notify 设置</h1>
+            <a href="https://yanqs.me/wp-comment-notify-plugin/" target="_blank" class="button">插件主页</a>
+        </div>
+
+        <div class="pcn-nav-tab-wrapper">
+            <a href="#" class="pcn-nav-tab active" data-target="tab-general">常规设置</a>
+            <a href="#" class="pcn-nav-tab" data-target="tab-smtp">SMTP 设置</a>
+            <a href="#" class="pcn-nav-tab" data-target="tab-templates">邮件模板</a>
+            <a href="#" class="pcn-nav-tab" data-target="tab-test">测试与日志</a>
+        </div>
+
         <form method="post">
             <?php wp_nonce_field('pcn_save_settings'); ?>
 
-            <h2>授权与状态</h2>
+            <div id="tab-general" class="pcn-tab-content active">
+                <h2>授权与状态</h2>
             <p>
                 <a href="https://yanqs.me/wp-comment-notify-plugin/" target="_blank" rel="noopener noreferrer">
                     授权密钥购买
@@ -333,6 +391,8 @@ function pcn_options_page() {
                 </tr>
 
             </table>
+            </div> <!-- End tab-general -->
+            <div id="tab-smtp" class="pcn-tab-content">
             <h2>SMTP 设置</h2>
             <table class="form-table">
                 <tr>
@@ -362,10 +422,20 @@ function pcn_options_page() {
                     <td><input type="checkbox" name="smtp_auth" value="1" <?php checked(! empty($smtp['smtp_auth'])); ?> /></td>
                 </tr>
                 <tr>
+                    <th scope="row">认证类型</th>
+                    <td>
+                        <select name="auth_type" id="pcn-auth-type-select">
+                            <option value="login" <?php selected($smtp['auth_type'] ?? '', 'login'); ?>>普通登录 (用户名/密码)</option>
+                            <option value="oauth2" <?php selected($smtp['auth_type'] ?? '', 'oauth2'); ?>>OAuth2 (若支持)</option>
+                        </select>
+                        <p class="description">普通登录下可选择具体登录机制（LOGIN/PLAIN）。</p>
+                    </td>
+                </tr>
+                <tr class="pcn-auth-login">
                     <th scope="row">用户名</th>
                     <td><input type="text" name="username" value="<?php echo esc_attr($smtp['username'] ?? ''); ?>" class="regular-text" /></td>
                 </tr>
-                <tr>
+                <tr class="pcn-auth-login">
                     <th scope="row">密码</th>
                     <td><input type="password" name="password" value="<?php echo esc_attr($smtp['password'] ?? ''); ?>" class="regular-text" /></td>
                 </tr>
@@ -381,17 +451,7 @@ function pcn_options_page() {
                         <p class="description">用于显示在收件人处的发件人名称，留空则使用站点名称。</p>
                     </td>
                 </tr>
-                <tr>
-                    <th scope="row">认证类型</th>
-                    <td>
-                        <select name="auth_type">
-                            <option value="login" <?php selected($smtp['auth_type'] ?? '', 'login'); ?>>普通登录 (用户名/密码)</option>
-                            <option value="oauth2" <?php selected($smtp['auth_type'] ?? '', 'oauth2'); ?>>OAuth2 (若支持)</option>
-                        </select>
-                        <p class="description">普通登录下可选择具体登录机制（LOGIN/PLAIN）。</p>
-                    </td>
-                </tr>
-                <tr>
+                <tr class="pcn-auth-login">
                     <th scope="row">登录机制</th>
                     <td>
                         <select name="login_mechanism">
@@ -401,20 +461,22 @@ function pcn_options_page() {
                         </select>
                     </td>
                 </tr>
-                <tr>
+                <tr class="pcn-auth-oauth2">
                     <th scope="row">OAuth2 client_id</th>
                     <td><input type="text" name="client_id" value="<?php echo esc_attr($smtp['client_id'] ?? ''); ?>" class="regular-text" /></td>
                 </tr>
-                <tr>
+                <tr class="pcn-auth-oauth2">
                     <th scope="row">OAuth2 client_secret</th>
                     <td><input type="text" name="client_secret" value="<?php echo esc_attr($smtp['client_secret'] ?? ''); ?>" class="regular-text" /></td>
                 </tr>
-                <tr>
+                <tr class="pcn-auth-oauth2">
                     <th scope="row">OAuth2 refresh_token</th>
                     <td><input type="text" name="refresh_token" value="<?php echo esc_attr($smtp['refresh_token'] ?? ''); ?>" class="regular-text" /></td>
                 </tr>
             </table>
 
+            </div> <!-- End tab-smtp -->
+            <div id="tab-templates" class="pcn-tab-content">
             <h2>邮件模板</h2>
             <p>编辑 HTML 模板。系统会尝试将更改写入插件的 `templates/` 目录（需可写）。如果写入失败，模板会保存到数据库选项 `pcn_templates`。</p>
             <h3>回复通知模板 (reply)</h3>
@@ -425,11 +487,15 @@ function pcn_options_page() {
 
             <h3>待审核通知模板 (pending)</h3>
             <textarea name="tpl_pending" rows="10" style="width:100%;font-family:monospace;"><?php echo esc_textarea($tpls['pending'] ?? ''); ?></textarea>
+            
+            </div> <!-- End tab-templates -->
 
-            <p class="submit"><input type="submit" name="pcn_save_settings" id="submit" class="button button-primary" value="保存设置" /></p>
+            <div class="pcn-submit-bar">
+                <input type="submit" name="pcn_save_settings" id="submit" class="button button-primary button-hero" value="保存所有设置" />
+            </div>
         </form>
 
-        <hr />
+        <div id="tab-test" class="pcn-tab-content">
         <h2>SMTP 测试</h2>
         <form method="post">
             <?php wp_nonce_field('pcn_test_smtp'); ?>
@@ -470,11 +536,12 @@ function pcn_options_page() {
                 echo '<p>暂无调试日志。</p>';
             }
         }
+        ?>
+        </div> <!-- End tab-test -->
+    </div> <!-- End wrap -->
+    <?php
         if (isset($_POST['pcn_clear_logs']) && check_admin_referer('pcn_show_logs')) {
             delete_option('pcn_debug_log');
             echo '<div class="updated"><p>已清空调试日志。</p></div>';
         }
-        ?>
-    </div>
-    <?php
-}
+    }
