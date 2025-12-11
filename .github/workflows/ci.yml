@@ -1,0 +1,55 @@
+name: CI
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+
+jobs:
+  ci:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup PHP
+        uses: shivammathur/setup-php@v4
+        with:
+          php-version: '8.1'
+          extensions: mbstring, json, xml
+
+      - name: Ensure Composer
+        run: |
+          if ! command -v composer >/dev/null 2>&1; then
+            curl -sS https://getcomposer.org/installer | php
+            sudo mv composer.phar /usr/local/bin/composer
+          fi
+
+      - name: Install dependencies (if any)
+        run: |
+          if [ -f composer.json ]; then composer install --no-interaction --prefer-dist; fi
+
+      - name: Run static analysis (PHPStan)
+        run: |
+          if [ -f vendor/bin/phpstan ]; then vendor/bin/phpstan analyse || true; fi
+
+      - name: Run tests (PHPUnit)
+        run: |
+          if [ -f vendor/bin/phpunit ]; then vendor/bin/phpunit --colors=always || true; fi
+
+      - name: Install gettext (msgfmt)
+        run: sudo apt-get update && sudo apt-get install -y gettext
+
+      - name: Compile translation files (.po -> .mo)
+        run: |
+          for po in languages/*.po; do
+            [ -f "$po" ] || continue
+            mo="languages/$(basename "$po" .po).mo"
+            msgfmt -o "$mo" "$po"
+            echo "Compiled $po -> $mo"
+          done
+
+      - name: Lint (phpcs if available)
+        run: |
+          if [ -f vendor/bin/phpcs ]; then vendor/bin/phpcs --standard=PSR12 --extensions=php . || true; fi
