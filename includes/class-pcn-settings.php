@@ -72,6 +72,7 @@ class PCN_Settings {
             'queue_batch' => get_option('pcn_queue_batch', 10),
             'queue_retries' => get_option('pcn_queue_retries', 5),
         );
+        $queue_nonce = wp_create_nonce('pcn_queue_action');
 
         // Include view
         include PCN_PLUGIN_DIR . 'includes/views/settings-page.php';

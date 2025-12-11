@@ -250,9 +250,73 @@
                         <?php if (! empty($queue_count)): ?>
                             <p class="description"><?php printf(__('当前队列中有 %d 条待发送邮件。', 'wp-comment-notify'), intval($queue_count)); ?></p>
                         <?php endif; ?>
+                        <p>
+                            <button type="button" id="pcn-refresh-queue" class="button"><?php esc_html_e('刷新队列状态', 'wp-comment-notify'); ?></button>
+                        </p>
+                        <div id="pcn-queue-status" style="margin-top:10px;">
+                            <strong><?php _e('最近队列处理记录：', 'wp-comment-notify'); ?></strong>
+                            <div id="pcn-queue-actions" style="max-height:200px;overflow:auto;background:#f7f7f7;padding:8px;border:1px solid #ddd;margin-top:8px;"></div>
+                        </div>
                     </td>
                 </tr>
             </table>
+            <script>
+                (function($){
+                    var ajaxurl = '<?php echo admin_url('admin-ajax.php'); ?>';
+                    var nonce = '<?php echo esc_js($queue_nonce); ?>';
+                    function renderActions(actions){
+                        var html = '';
+                        if (!actions || actions.length === 0) {
+                            html = '<div><?php esc_html_e('暂无队列处理记录。', 'wp-comment-notify'); ?></div>';
+                        } else {
+                            actions.slice().reverse().forEach(function(a){
+                                html += '<div style="border-bottom:1px solid #eee;padding:6px 0;">';
+                                html += '<div style="font-size:12px;color:#666;">' + a.time + ' — ' + escHtml(a.result) + '</div>';
+                                html += '<div><strong>' + escHtml(a.to) + '</strong> &nbsp; ' + escHtml(a.subject) + '</div>';
+                                if (a.error) { html += '<div style="color:#a00;font-size:12px;">' + escHtml(a.error) + '</div>'; }
+                                html += '</div>';
+                            });
+                        }
+                        $('#pcn-queue-actions').html(html);
+                    }
+                    function escHtml(s){ return String(s).replace(/[&<>"']/g, function(c){ return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]; }); }
+                    $('#pcn-refresh-queue').on('click', function(){
+                        $.post(ajaxurl, { action: 'pcn_get_queue_status', nonce: nonce }, function(res){
+                            if (res.success) {
+                                renderActions(res.data.recent_actions);
+                            } else {
+                                alert('Error');
+                            }
+                        });
+                    });
+                    $('#pcn-refresh-queue').trigger('click');
+                    // Process queue via AJAX
+                    $('input[name="pcn_process_queue"]').on('click', function(e){
+                        e.preventDefault();
+                        $.post(ajaxurl, { action: 'pcn_process_queue', nonce: nonce }, function(res){
+                            if (res.success) {
+                                renderActions(res.data.recent_actions);
+                                alert('<?php esc_js_e('队列已处理，已更新记录。', 'wp-comment-notify'); ?>');
+                            } else {
+                                alert('Error');
+                            }
+                        });
+                    });
+                    // Clear queue via AJAX
+                    $('input[name="pcn_clear_queue"]').on('click', function(e){
+                        if (! confirm('<?php echo esc_js( __( '确定要清空邮件队列吗？此操作不可恢复。', 'wp-comment-notify' ) ); ?>')) { return false; }
+                        e.preventDefault();
+                        $.post(ajaxurl, { action: 'pcn_clear_queue', nonce: nonce }, function(res){
+                            if (res.success) {
+                                renderActions([]);
+                                alert('<?php esc_js_e('邮件队列已清空。', 'wp-comment-notify'); ?>');
+                            } else {
+                                alert('Error');
+                            }
+                        });
+                    });
+                })(jQuery);
+            </script>
         </table>
 
         </div> <!-- End tab-smtp -->

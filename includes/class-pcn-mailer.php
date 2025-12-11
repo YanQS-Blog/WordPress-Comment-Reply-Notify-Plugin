@@ -13,6 +13,10 @@ class PCN_Mailer {
         add_action('wp_mail_failed', array(__CLASS__, 'capture_mail_error'));
         // Queue processing hook
         add_action('pcn_process_queue', array(__CLASS__, 'process_queue'));
+        // AJAX endpoints for admin queue UI
+        add_action('wp_ajax_pcn_get_queue_status', array(__CLASS__, 'ajax_get_queue_status'));
+        add_action('wp_ajax_pcn_process_queue', array(__CLASS__, 'ajax_process_queue'));
+        add_action('wp_ajax_pcn_clear_queue', array(__CLASS__, 'ajax_clear_queue'));
     }
 
     public static function capture_mail_error($error) {
@@ -256,12 +260,14 @@ class PCN_Mailer {
 
             if ($sent) {
                 self::log_email_attempt($item['to'], $item['subject'], true, '');
+                self::log_queue_action($item, 'success', '');
                 // remove from queue
                 unset($queue[$idx]);
             } else {
                 $item['attempts'] = intval($item['attempts']) + 1;
                 if ($item['attempts'] > $max_retries) {
                     self::log_email_attempt($item['to'], $item['subject'], false, self::$last_mail_error ?: 'max_retries');
+                    self::log_queue_action($item, 'failed', self::$last_mail_error ?: 'max_retries');
                     unset($queue[$idx]);
                 } else {
                     // exponential backoff in seconds
@@ -287,6 +293,61 @@ class PCN_Mailer {
         }
 
         delete_transient('pcn_queue_lock');
+    }
+
+    private static function log_queue_action($item, $result, $error = '') {
+        $actions = get_option('pcn_queue_actions', array());
+        if (! is_array($actions)) { $actions = array(); }
+        $actions[] = array(
+            'time' => current_time('mysql'),
+            'id' => $item['id'] ?? '',
+            'to' => $item['to'] ?? '',
+            'subject' => $item['subject'] ?? '',
+            'attempts' => isset($item['attempts']) ? intval($item['attempts']) : 0,
+            'result' => $result,
+            'error' => $error,
+        );
+        if (count($actions) > 200) { $actions = array_slice($actions, -200); }
+        update_option('pcn_queue_actions', $actions, false);
+    }
+
+    public static function ajax_get_queue_status() {
+        if (! current_user_can('manage_options')) {
+            wp_send_json_error('permission');
+        }
+        check_ajax_referer('pcn_queue_action', 'nonce');
+        $queue = get_option('pcn_email_queue', array());
+        $actions = get_option('pcn_queue_actions', array());
+        $data = array(
+            'queue_count' => is_array($queue) ? count($queue) : 0,
+            'recent_actions' => array_slice(is_array($actions) ? $actions : array(), -20),
+        );
+        wp_send_json_success($data);
+    }
+
+    public static function ajax_process_queue() {
+        if (! current_user_can('manage_options')) {
+            wp_send_json_error('permission');
+        }
+        check_ajax_referer('pcn_queue_action', 'nonce');
+        // Run processing (synchronous)
+        self::process_queue();
+        $queue = get_option('pcn_email_queue', array());
+        $actions = get_option('pcn_queue_actions', array());
+        $data = array(
+            'queue_count' => is_array($queue) ? count($queue) : 0,
+            'recent_actions' => array_slice(is_array($actions) ? $actions : array(), -20),
+        );
+        wp_send_json_success($data);
+    }
+
+    public static function ajax_clear_queue() {
+        if (! current_user_can('manage_options')) {
+            wp_send_json_error('permission');
+        }
+        check_ajax_referer('pcn_queue_action', 'nonce');
+        delete_option('pcn_email_queue');
+        wp_send_json_success(array('queue_count' => 0));
     }
 
     public static function get_template($name, $vars = array()) {
