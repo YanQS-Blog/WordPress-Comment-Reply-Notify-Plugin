@@ -11,6 +11,8 @@ class PCN_Mailer {
         add_action('comment_post', array(__CLASS__, 'handle_comment_post'));
         add_action('phpmailer_init', array(__CLASS__, 'init_phpmailer'), PHP_INT_MAX);
         add_action('wp_mail_failed', array(__CLASS__, 'capture_mail_error'));
+        // Queue processing hook
+        add_action('pcn_process_queue', array(__CLASS__, 'process_queue'));
     }
 
     public static function capture_mail_error($error) {
@@ -105,13 +107,19 @@ class PCN_Mailer {
                         'unsubscribe_url' => $unsubscribe_url,
                     ));
 
-                    add_filter('wp_mail_content_type', array(__CLASS__, 'set_html_content_type'));
-                    self::$last_mail_error = '';
-                    $sent = wp_mail($to, $subject, $message, $headers);
-                    self::log_email_attempt($to, $subject, $sent, $sent ? '' : self::$last_mail_error);
-                    remove_filter('wp_mail_content_type', array(__CLASS__, 'set_html_content_type'));
-                    if (! $sent) {
-                        error_log('pcn: 回复通知邮件发送失败，comment_id=' . $comment_id);
+                    // Enqueue email for asynchronous sending if enabled
+                    $queue_enabled = get_option('pcn_queue_enabled', 1);
+                    if ($queue_enabled) {
+                        self::enqueue_email($to, $subject, $message, $headers, array('comment_id' => $comment_id, 'type' => 'reply'));
+                    } else {
+                        add_filter('wp_mail_content_type', array(__CLASS__, 'set_html_content_type'));
+                        self::$last_mail_error = '';
+                        $sent = wp_mail($to, $subject, $message, $headers);
+                        self::log_email_attempt($to, $subject, $sent, $sent ? '' : self::$last_mail_error);
+                        remove_filter('wp_mail_content_type', array(__CLASS__, 'set_html_content_type'));
+                        if (! $sent) {
+                            error_log('pcn: 回复通知邮件发送失败，comment_id=' . $comment_id);
+                        }
                     }
                 }
             }
@@ -140,13 +148,18 @@ class PCN_Mailer {
                 'trash_url' => $trash_url,
                 'spam_url' => $spam_url,
             ));
-            add_filter('wp_mail_content_type', array(__CLASS__, 'set_html_content_type'));
-            self::$last_mail_error = '';
-            $sent = wp_mail($to, $subject, $message, $headers);
-            self::log_email_attempt($to, $subject, $sent, $sent ? '' : self::$last_mail_error);
-            remove_filter('wp_mail_content_type', array(__CLASS__, 'set_html_content_type'));
-            if (! $sent) {
-                error_log('pcn: 管理员新评论通知邮件发送失败，comment_id=' . $comment_id);
+            $queue_enabled = get_option('pcn_queue_enabled', 1);
+            if ($queue_enabled) {
+                self::enqueue_email($to, $subject, $message, $headers, array('comment_id' => $comment_id, 'type' => 'admin_new'));
+            } else {
+                add_filter('wp_mail_content_type', array(__CLASS__, 'set_html_content_type'));
+                self::$last_mail_error = '';
+                $sent = wp_mail($to, $subject, $message, $headers);
+                self::log_email_attempt($to, $subject, $sent, $sent ? '' : self::$last_mail_error);
+                remove_filter('wp_mail_content_type', array(__CLASS__, 'set_html_content_type'));
+                if (! $sent) {
+                    error_log('pcn: 管理员新评论通知邮件发送失败，comment_id=' . $comment_id);
+                }
             }
         }
 
@@ -174,15 +187,106 @@ class PCN_Mailer {
                 'spam_url' => $spam_url,
             ));
 
-            add_filter('wp_mail_content_type', array(__CLASS__, 'set_html_content_type'));
-            self::$last_mail_error = '';
-            $sent = wp_mail($to, $subject, $message, $headers);
-            self::log_email_attempt($to, $subject, $sent, $sent ? '' : self::$last_mail_error);
-            remove_filter('wp_mail_content_type', array(__CLASS__, 'set_html_content_type'));
-            if (! $sent) {
-                error_log('pcn: 审核通知邮件发送失败，comment_id=' . $comment_id);
+            $queue_enabled = get_option('pcn_queue_enabled', 1);
+            if ($queue_enabled) {
+                self::enqueue_email($to, $subject, $message, $headers, array('comment_id' => $comment_id, 'type' => 'pending'));
+            } else {
+                add_filter('wp_mail_content_type', array(__CLASS__, 'set_html_content_type'));
+                self::$last_mail_error = '';
+                $sent = wp_mail($to, $subject, $message, $headers);
+                self::log_email_attempt($to, $subject, $sent, $sent ? '' : self::$last_mail_error);
+                remove_filter('wp_mail_content_type', array(__CLASS__, 'set_html_content_type'));
+                if (! $sent) {
+                    error_log('pcn: 审核通知邮件发送失败，comment_id=' . $comment_id);
+                }
             }
         }
+    }
+
+    // Queue functions
+    public static function enqueue_email($to, $subject, $message, $headers = array(), $meta = array()) {
+        $queue = get_option('pcn_email_queue', array());
+        if (! is_array($queue)) { $queue = array(); }
+        $id = uniqid('pcn_', true);
+        $item = array(
+            'id' => $id,
+            'time' => current_time('mysql'),
+            'to' => $to,
+            'subject' => $subject,
+            'message' => $message,
+            'headers' => $headers,
+            'attempts' => 0,
+            'next_attempt' => time(),
+            'meta' => $meta,
+        );
+        $queue[] = $item;
+        update_option('pcn_email_queue', $queue, false);
+        // Schedule processor if not scheduled
+        if (! wp_next_scheduled('pcn_process_queue')) {
+            wp_schedule_single_event(time() + 30, 'pcn_process_queue');
+        }
+        return $id;
+    }
+
+    public static function process_queue() {
+        if (! function_exists('get_option')) { return; }
+        // Prevent overlapping runs
+        if (get_transient('pcn_queue_lock')) { return; }
+        set_transient('pcn_queue_lock', 1, 300);
+
+        $queue = get_option('pcn_email_queue', array());
+        if (! is_array($queue) || empty($queue)) {
+            delete_transient('pcn_queue_lock');
+            return;
+        }
+
+        $max_per_run = intval(get_option('pcn_queue_batch', 10));
+        $max_retries = intval(get_option('pcn_queue_retries', 5));
+        $processed = 0;
+        $now = time();
+        foreach ($queue as $idx => $item) {
+            if ($processed >= $max_per_run) { break; }
+            if (! isset($item['next_attempt']) || intval($item['next_attempt']) > $now) { continue; }
+
+            // attempt send
+            add_filter('wp_mail_content_type', array(__CLASS__, 'set_html_content_type'));
+            self::$last_mail_error = '';
+            $sent = wp_mail($item['to'], $item['subject'], $item['message'], $item['headers']);
+            remove_filter('wp_mail_content_type', array(__CLASS__, 'set_html_content_type'));
+
+            if ($sent) {
+                self::log_email_attempt($item['to'], $item['subject'], true, '');
+                // remove from queue
+                unset($queue[$idx]);
+            } else {
+                $item['attempts'] = intval($item['attempts']) + 1;
+                if ($item['attempts'] > $max_retries) {
+                    self::log_email_attempt($item['to'], $item['subject'], false, self::$last_mail_error ?: 'max_retries');
+                    unset($queue[$idx]);
+                } else {
+                    // exponential backoff in seconds
+                    $delay = pow(2, $item['attempts']) * 60;
+                    $item['next_attempt'] = time() + $delay;
+                    $queue[$idx] = $item;
+                }
+            }
+            $processed++;
+        }
+
+        // Reindex and save
+        if (! empty($queue)) {
+            $queue = array_values($queue);
+            update_option('pcn_email_queue', $queue, false);
+        } else {
+            delete_option('pcn_email_queue');
+        }
+
+        // If still items remain, schedule next run
+        if (! empty($queue) && ! wp_next_scheduled('pcn_process_queue')) {
+            wp_schedule_single_event(time() + 60, 'pcn_process_queue');
+        }
+
+        delete_transient('pcn_queue_lock');
     }
 
     public static function get_template($name, $vars = array()) {
