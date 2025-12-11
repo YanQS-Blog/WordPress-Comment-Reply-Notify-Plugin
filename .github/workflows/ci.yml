@@ -1,5 +1,8 @@
 name: CI
 
+permissions:
+  contents: write
+
 on:
   push:
     branches: [ main ]
@@ -49,6 +52,20 @@ jobs:
             msgfmt -o "$mo" "$po"
             echo "Compiled $po -> $mo"
           done
+
+      - name: Commit and push compiled .mo files (if changed)
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add languages/*.mo || true
+          # Only commit if there are changes
+          if ! git diff --cached --quiet; then
+            git commit -m "chore(i18n): compile .mo files [ci skip]" || true
+            git push origin HEAD:${{ github.ref_name }}
+            echo "Pushed compiled .mo files to ${GITHUB_REF_NAME:-${{ github.ref_name }}}"
+          else
+            echo "No .mo changes to commit"
+          fi
 
       - name: Lint (phpcs if available)
         run: |

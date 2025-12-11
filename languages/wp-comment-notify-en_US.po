@@ -3,7 +3,7 @@ msgstr ""
 "Project-Id-Version: WP Comment & Reply Notify\n"
 "Report-Msgid-Bugs-To: \n"
 "POT-Creation-Date: 2023-10-27 12:00+0000\n"
-"PO-Revision-Date: 2023-10-27 12:00+0000\n"
+"PO-Revision-Date: 2025-12-12 00:00+0000\n"
 "Last-Translator: \n"
 "Language-Team: \n"
 "Language: en_US\n"
@@ -235,4 +235,10 @@ msgstr "Failure"
 
 msgid "清空调试日志"
 msgstr "Clear Debug Logs"
+
+msgid "清除凭据"
+msgstr "Clear Credentials"
+
+msgid "确定要清除所有已保存的敏感凭据吗？推荐通过环境变量提供凭据。"
+msgstr "Are you sure you want to clear all saved sensitive credentials? It's recommended to provide credentials via environment variables."
 
