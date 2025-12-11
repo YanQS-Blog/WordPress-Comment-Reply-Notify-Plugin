@@ -35,6 +35,18 @@ Get License: [https://yanqs.me/wp-comment-notify-plugin/](https://yanqs.me/wp-co
   - **Login Mechanism**: Choose between "Auto Negotiate", "LOGIN", and "PLAIN" SMTP authentication mechanisms to compatible with different service providers.
   - **Force IPv4 Connection**: Force IPv4 connection to the SMTP server when there are IPv6 connection issues in the server environment.
 
+- **Template Editing Upgraded (TinyMCE)**:
+  - The admin template editor now integrates TinyMCE, providing a richer WYSIWYG HTML editing experience with better formatting and paste handling.
+
+- **One‑click Unsubscribe**:
+  - Reply notification emails include a secure unsubscribe link enabling recipients to opt out of notifications for a specific post. The link uses hash verification to prevent abuse.
+
+- **Email Send Records**:
+  - A new "Email Send Log" tab in the settings records each sent email with time, recipient, subject, status (success/failure), and any error messages to aid troubleshooting.
+
+- **Codebase Refactor**:
+  - The plugin is refactored into classes/modules under `includes/` (e.g., `PCN_Mailer`, `PCN_Settings`, `PCN_Unsubscribe`) for improved maintainability and extensibility.
+
 ## Installation & Activation
 
 1.  Upload the entire `wp-comment-notify` folder to the `/wp-content/plugins/` directory of your WordPress site.
