@@ -1,0 +1,13 @@
+{
+    "name": "yanqs/wp-comment-notify",
+    "description": "WP Comment & Reply Notify plugin",
+    "type": "wordpress-plugin",
+    "require-dev": {
+        "phpunit/phpunit": "^9.5"
+    },
+    "autoload": {
+        "psr-4": {
+            "PCN\\": "includes/"
+        }
+    }
+}
