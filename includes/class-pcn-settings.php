@@ -99,6 +99,28 @@ class PCN_Settings {
             delete_option('pcn_debug_log');
             echo '<div class="updated"><p>' . __('已清空 SMTP 调试日志。', 'wp-comment-notify') . '</p></div>';
         }
+
+        // Migrate legacy option-based logs to DB table if needed
+        if (is_admin() && current_user_can('manage_options')) {
+            self::migrate_option_logs_to_db();
+        }
+
+        // Export logs CSV (POST submit)
+        if (isset($_POST['pcn_export_logs']) && check_admin_referer('pcn_show_logs')) {
+            $days = isset($_POST['pcn_export_days']) ? intval($_POST['pcn_export_days']) : 0;
+            self::export_logs_csv($days);
+        }
+
+        // Apply retention policy
+        if (isset($_POST['pcn_set_retention']) && check_admin_referer('pcn_show_logs')) {
+            $days = isset($_POST['pcn_retention_days']) ? intval($_POST['pcn_retention_days']) : 0;
+            if ($days > 0) {
+                self::apply_retention_policy($days);
+                echo '<div class="updated"><p>' . sprintf(__('已应用保留策略：保留最近 %d 天的日志，其余已删除。', 'wp-comment-notify'), $days) . '</p></div>';
+            } else {
+                echo '<div class="error"><p>' . __('请提供大于 0 的保留天数。', 'wp-comment-notify') . '</p></div>';
+            }
+        }
     }
 
     private static function handle_smtp_test() {
@@ -166,6 +188,81 @@ class PCN_Settings {
         } else {
             echo '<div class="error"><p>' . __('请填写有效的测试收件人邮箱。', 'wp-comment-notify') . '</p></div>';
         }
+    }
+
+    private static function migrate_option_logs_to_db() {
+        global $wpdb;
+        $table = $wpdb->prefix . 'pcn_email_logs';
+        $option_logs = get_option('pcn_email_logs', array());
+        if (empty($option_logs) || ! is_array($option_logs)) {
+            return;
+        }
+        // Check if table exists
+        $check = $wpdb->get_results($wpdb->prepare("SHOW TABLES LIKE %s", $wpdb->esc_like($table)));
+        if (empty($check)) {
+            return;
+        }
+        // Determine if table already has rows; if so, skip migration
+        $count = (int) $wpdb->get_var("SELECT COUNT(*) FROM {$table}");
+        if ($count > 0) {
+            // remove legacy option to avoid repeated migrations
+            delete_option('pcn_email_logs');
+            return;
+        }
+        foreach (array_reverse($option_logs) as $entry) {
+            $wpdb->insert(
+                $table,
+                array(
+                    'time' => isset($entry['time']) ? $entry['time'] : current_time('mysql'),
+                    'to' => isset($entry['to']) ? substr($entry['to'], 0, 255) : '',
+                    'subject' => isset($entry['subject']) ? $entry['subject'] : '',
+                    'status' => isset($entry['status']) ? $entry['status'] : 'failure',
+                    'error' => isset($entry['error']) ? $entry['error'] : '',
+                    'meta' => ''
+                ),
+                array('%s','%s','%s','%s','%s','%s')
+            );
+        }
+        delete_option('pcn_email_logs');
+    }
+
+    private static function export_logs_csv($days = 0) {
+        global $wpdb;
+        $table = $wpdb->prefix . 'pcn_email_logs';
+        // Build query
+        if ($days > 0) {
+            $since = gmdate('Y-m-d H:i:s', time() - intval($days) * 24 * 3600);
+            $rows = $wpdb->get_results($wpdb->prepare("SELECT time, `to`, subject, status, error FROM {$table} WHERE time >= %s ORDER BY time DESC", $since), ARRAY_A);
+            $filename = 'pcn-email-logs-last-' . intval($days) . 'd-' . date('Ymd-His') . '.csv';
+        } else {
+            $rows = $wpdb->get_results("SELECT time, `to`, subject, status, error FROM {$table} ORDER BY time DESC", ARRAY_A);
+            $filename = 'pcn-email-logs-' . date('Ymd-His') . '.csv';
+        }
+
+        if (empty($rows)) {
+            return false;
+        }
+
+        header('Content-Type: text/csv; charset=UTF-8');
+        header('Content-Disposition: attachment; filename="' . $filename . '"');
+        $out = fopen('php://output', 'w');
+        // BOM for Excel
+        echo "\xEF\xBB\xBF";
+        fputcsv($out, array('time', 'to', 'subject', 'status', 'error'));
+        foreach ($rows as $r) {
+            fputcsv($out, array($r['time'], $r['to'], $r['subject'], $r['status'], $r['error']));
+        }
+        fclose($out);
+        exit;
+    }
+
+    private static function apply_retention_policy($days) {
+        global $wpdb;
+        $table = $wpdb->prefix . 'pcn_email_logs';
+        $days = intval($days);
+        if ($days <= 0) { return; }
+        $threshold = gmdate('Y-m-d H:i:s', time() - $days * 24 * 3600);
+        $wpdb->query($wpdb->prepare("DELETE FROM {$table} WHERE time < %s", $threshold));
     }
 
     private static function save_settings() {

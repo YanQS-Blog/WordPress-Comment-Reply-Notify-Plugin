@@ -287,6 +287,18 @@
                 <input type="submit" name="pcn_show_logs" class="button" value="<?php esc_attr_e('刷新', 'wp-comment-notify'); ?>" />
                 <input type="submit" name="pcn_clear_logs" class="button" value="<?php esc_attr_e('清空日志', 'wp-comment-notify'); ?>" />
             </p>
+
+            <h3><?php _e('导出与保留策略', 'wp-comment-notify'); ?></h3>
+            <p>
+                <?php _e('导出最近 N 天的日志为 CSV（填 0 导出全部）：', 'wp-comment-notify'); ?>
+                <input type="number" name="pcn_export_days" value="0" class="small-text" />
+                <input type="submit" name="pcn_export_logs" class="button" value="<?php esc_attr_e('导出 CSV', 'wp-comment-notify'); ?>" />
+            </p>
+            <p>
+                <?php _e('设置保留策略：删除早于 N 天的日志（谨慎操作）：', 'wp-comment-notify'); ?>
+                <input type="number" name="pcn_retention_days" value="90" class="small-text" />
+                <input type="submit" name="pcn_set_retention" class="button" value="<?php esc_attr_e('应用保留策略', 'wp-comment-notify'); ?>" />
+            </p>
         </form>
         <table class="widefat fixed striped">
             <thead>
