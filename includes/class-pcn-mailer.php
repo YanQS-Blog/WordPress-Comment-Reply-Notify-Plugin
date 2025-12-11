@@ -20,23 +20,35 @@ class PCN_Mailer {
     }
 
     public static function log_email_attempt($to, $subject, $sent, $error = '') {
-        $logs = get_option('pcn_email_logs', array());
-        if (!is_array($logs)) $logs = array();
-        
-        $log_entry = array(
-            'time' => current_time('mysql'),
-            'to' => $to,
-            'subject' => $subject,
-            'status' => $sent ? 'success' : 'failure',
-            'error' => $error
-        );
-        
-        array_unshift($logs, $log_entry);
-        if (count($logs) > 100) {
-            $logs = array_slice($logs, 0, 100);
+        global $wpdb;
+        $table = $wpdb->prefix . 'pcn_email_logs';
+        // Fallback to option storage if table does not exist
+        $check = $wpdb->get_results($wpdb->prepare("SHOW TABLES LIKE %s", $wpdb->esc_like($table)));
+        $time = current_time('mysql');
+        if (! empty($check)) {
+            $wpdb->insert(
+                $table,
+                array(
+                    'time' => $time,
+                    'to' => substr($to, 0, 255),
+                    'subject' => $subject,
+                    'status' => $sent ? 'success' : 'failure',
+                    'error' => $error,
+                    'meta' => ''
+                ),
+                array('%s','%s','%s','%s','%s','%s')
+            );
+            // Keep only recent 1000 rows to cap growth (rotation)
+            $wpdb->query("DELETE FROM {$table} WHERE id NOT IN (SELECT id FROM (SELECT id FROM {$table} ORDER BY id DESC LIMIT 1000) x)");
+        } else {
+            // fallback: keep using option but limit size
+            $logs = get_option('pcn_email_logs', array());
+            if (! is_array($logs)) { $logs = array(); }
+            $log_entry = array('time' => $time, 'to' => $to, 'subject' => $subject, 'status' => $sent ? 'success' : 'failure', 'error' => $error);
+            array_unshift($logs, $log_entry);
+            if (count($logs) > 100) { $logs = array_slice($logs, 0, 100); }
+            update_option('pcn_email_logs', $logs, false);
         }
-        
-        update_option('pcn_email_logs', $logs, false);
     }
 
     public static function set_html_content_type() {

@@ -37,6 +37,26 @@ if (is_admin()) {
 
 // 激活/卸载钩子
 function pcn_activate() {
+    global $wpdb;
+    $table_name = $wpdb->prefix . 'pcn_email_logs';
+    $charset_collate = $wpdb->get_charset_collate();
+
+    $sql = "CREATE TABLE IF NOT EXISTS {$table_name} (
+        id BIGINT(20) NOT NULL AUTO_INCREMENT,
+        time DATETIME NOT NULL,
+        `to` VARCHAR(255) NOT NULL,
+        subject TEXT NOT NULL,
+        status VARCHAR(20) NOT NULL,
+        error TEXT,
+        meta LONGTEXT,
+        PRIMARY KEY  (id),
+        KEY `to_idx` (`to`(191)),
+        KEY `time_idx` (time),
+        KEY `status_idx` (status)
+    ) {$charset_collate};";
+
+    require_once ABSPATH . 'wp-admin/includes/upgrade.php';
+    dbDelta($sql);
 }
 register_activation_hook(__FILE__, 'pcn_activate');
 
