@@ -225,3 +225,6 @@ msgstr "New comment on article \"%2$s\" at \"%1$s\""
 
 msgid "在「%s」的文章《%s》中有新的评论需要审核"
 msgstr "New comment awaiting moderation on article \"%2$s\" at \"%1$s\""
+
+msgid "注意：OAuth2 认证仅在部分 SMTP 服务（如 Gmail/Google Workspace）支持，且需要预先在对应平台创建应用并获取相关凭据。SMTP 调试成功后请务必删除主题目录下的 smtp_test.php 文件。"
+msgstr "Note: OAuth2 authentication is only supported by some SMTP services (such as Gmail/Google Workspace) and requires creating an app and obtaining credentials on the corresponding platform in advance. Please be sure to delete the smtp_test.php file in the plugin directory after successful SMTP debugging."

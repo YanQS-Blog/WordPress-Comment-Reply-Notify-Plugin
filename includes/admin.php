@@ -164,7 +164,6 @@ function pcn_options_page() {
                 update_option('pcn_license_key', '');
                 update_option('pcn_license_status', 'invalid');
             } else {
-                // Base64 encoded: https://yanqs.me/Verification/verify.php?pass=
                 $api_url = base64_decode('aHR0cHM6Ly95YW5xcy5tZS9WZXJpZmljYXRpb24vdmVyaWZ5LnBocD9wYXNzPQ==');
                 $response = wp_remote_get($api_url . $new_key);
                 if (is_wp_error($response)) {
@@ -475,6 +474,7 @@ function pcn_options_page() {
                     <th scope="row">OAuth2 refresh_token</th>
                     <td><input type="text" name="refresh_token" value="<?php echo esc_attr($smtp['refresh_token'] ?? ''); ?>" class="regular-text" /></td>
                 </tr>
+                <p><?php _e('注意：OAuth2 认证仅在部分 SMTP 服务（如 Gmail/Google Workspace）支持，且需要预先在对应平台创建应用并获取相关凭据。SMTP 调试成功后请务必删除主题目录下的 smtp_test.php 文件。', 'wp-comment-notify'); ?></p>
             </table>
 
             </div> <!-- End tab-smtp -->
