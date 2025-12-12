@@ -90,6 +90,15 @@ This is the core part of the plugin, please fill it in carefully.
 
 You can edit the email HTML templates for three different scenarios directly in the text box. Placeholders (e.g., `{{author}}`, `{{content}}`) can be used in the templates, but please note that these placeholders are hardcoded in the `includes/WordPress_Mail.php` file. To modify them, you need to edit the PHP file.
 
+New: template styles & preview
+
+- Each template now supports multiple style variants (Modern / Plain / Compact). In the admin "Email Templates" tab you can choose a style separately for `reply`, `new_comment`, and `pending` templates.
+- After selecting a style you may click "Load selected style" to load that style's template into the editor as a starting point, or edit a custom template directly and save.
+- Click "Preview" in the editor to open an email preview modal that renders the template with sample data so you can inspect the final output. For safety, the preview strips and ignores any PHP code in the template to avoid executing server-side code in the admin UI.
+- Style template files are located under `includes/templates/styles/{modern,plain,compact}/`. When you save a custom template the plugin will attempt to write it to `includes/templates/`; if that fails it will fall back to storing the template in the `pcn_templates` option in the database.
+
+Warning: when sending real emails the plugin's renderer (`includes/class-pcn-mailer.php`) will include template files and execute PHP inside them (if present). Only place PHP in templates if you fully trust the environment and understand the security implications.
+
 ## Troubleshooting
 
 If email sending fails, please follow these steps:

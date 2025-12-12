@@ -330,3 +330,34 @@ msgstr "Export CSV"
 msgid "应用保留策略"
 msgstr "Apply retention policy"
 
+# Template styles & preview UI
+msgid "选择风格模板"
+msgstr "Choose style template"
+
+msgid "载入所选风格"
+msgstr "Load selected style"
+
+msgid "预览"
+msgstr "Preview"
+
+msgid "邮件预览"
+msgstr "Email Preview"
+
+msgid "关闭"
+msgstr "Close"
+
+msgid "未找到指定风格模板文件。"
+msgstr "Specified style template file not found."
+
+msgid "预览失败"
+msgstr "Preview failed"
+
+msgid "Modern"
+msgstr "Modern"
+
+msgid "Plain"
+msgstr "Plain"
+
+msgid "Compact"
+msgstr "Compact"
+
