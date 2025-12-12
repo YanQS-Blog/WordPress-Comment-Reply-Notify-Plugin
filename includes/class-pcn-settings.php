@@ -12,8 +12,12 @@ class PCN_Settings {
         add_action('wp_ajax_pcn_run_diagnostics', array(__CLASS__, 'ajax_run_diagnostics'));
         // AJAX refresh logs
         add_action('wp_ajax_pcn_refresh_logs', array(__CLASS__, 'ajax_refresh_logs'));
+        // AJAX load debug logs
+        add_action('wp_ajax_pcn_load_debug_logs', array(__CLASS__, 'ajax_load_debug_logs'));
         // Generic AJAX form submit for settings page
         add_action('wp_ajax_pcn_ajax_form', array(__CLASS__, 'ajax_handle_form'));
+        // Handle CSV export via admin-post to allow direct download in iframe
+        add_action('admin_post_pcn_export_logs', array(__CLASS__, 'export_logs_csv_handler'));
     }
 
     public static function add_admin_menu() {
@@ -264,18 +268,37 @@ class PCN_Settings {
     private static function export_logs_csv($days = 0) {
         global $wpdb;
         $table = $wpdb->prefix . 'pcn_email_logs';
-        // Build query
+        // Determine filename
+        $site = sanitize_file_name(get_bloginfo('name')) ?: 'site';
         if ($days > 0) {
-            $since = gmdate('Y-m-d H:i:s', time() - intval($days) * 24 * 3600);
-            $rows = $wpdb->get_results($wpdb->prepare("SELECT time, `to`, subject, status, error FROM {$table} WHERE time >= %s ORDER BY time DESC", $since), ARRAY_A);
-            $filename = 'pcn-email-logs-last-' . intval($days) . 'd-' . date('Ymd-His') . '.csv';
+            $filename = sprintf('%s-email-logs-last-%dd-%s.csv', $site, intval($days), date('Ymd-His'));
         } else {
-            $rows = $wpdb->get_results("SELECT time, `to`, subject, status, error FROM {$table} ORDER BY time DESC", ARRAY_A);
-            $filename = 'pcn-email-logs-' . date('Ymd-His') . '.csv';
+            $filename = sprintf('%s-email-logs-%s.csv', $site, date('Ymd-His'));
         }
 
-        if (empty($rows)) {
-            return false;
+        // Check if DB table exists; if not fall back to option-based logs
+        $check = $wpdb->get_results($wpdb->prepare("SHOW TABLES LIKE %s", $wpdb->esc_like($table)));
+        if (! empty($check)) {
+            if ($days > 0) {
+                $since = gmdate('Y-m-d H:i:s', time() - intval($days) * 24 * 3600);
+                $rows = $wpdb->get_results($wpdb->prepare("SELECT time, `to`, subject, status, error FROM {$table} WHERE time >= %s ORDER BY time DESC", $since), ARRAY_A);
+            } else {
+                $rows = $wpdb->get_results("SELECT time, `to`, subject, status, error FROM {$table} ORDER BY time DESC", ARRAY_A);
+            }
+        } else {
+            $opt = get_option('pcn_email_logs', array());
+            if (! is_array($opt)) { $opt = array(); }
+            if ($days > 0 && ! empty($opt)) {
+                $since_ts = time() - intval($days) * 24 * 3600;
+                $keep = array();
+                foreach ($opt as $entry) {
+                    $t = isset($entry['time']) ? strtotime($entry['time']) : 0;
+                    if ($t >= $since_ts) { $keep[] = $entry; }
+                }
+                $rows = $keep;
+            } else {
+                $rows = $opt;
+            }
         }
 
         header('Content-Type: text/csv; charset=UTF-8');
@@ -284,10 +307,33 @@ class PCN_Settings {
         // BOM for Excel
         echo "\xEF\xBB\xBF";
         fputcsv($out, array('time', 'to', 'subject', 'status', 'error'));
-        foreach ($rows as $r) {
-            fputcsv($out, array($r['time'], $r['to'], $r['subject'], $r['status'], $r['error']));
+        if (! empty($rows) && is_array($rows)) {
+            foreach ($rows as $r) {
+                $time = isset($r['time']) ? $r['time'] : '';
+                $to = isset($r['to']) ? $r['to'] : '';
+                $subject = isset($r['subject']) ? $r['subject'] : '';
+                $status = isset($r['status']) ? $r['status'] : '';
+                $error = isset($r['error']) ? $r['error'] : '';
+                fputcsv($out, array($time, $to, $subject, $status, $error));
+            }
         }
         fclose($out);
+        exit;
+    }
+
+    // Public handler for admin-post.php?action=pcn_export_logs
+    public static function export_logs_csv_handler() {
+        if (! current_user_can('manage_options')) {
+            wp_die(__('无权限', 'wp-comment-notify'));
+        }
+        // Verify nonce
+        if (! isset($_REQUEST['pcn_show_logs_nonce']) || ! check_admin_referer('pcn_show_logs', 'pcn_show_logs_nonce')) {
+            wp_die(__('无效的请求（nonce 校验失败）', 'wp-comment-notify'));
+        }
+        $days = isset($_REQUEST['pcn_export_days']) ? intval($_REQUEST['pcn_export_days']) : 0;
+        // Call internal exporter
+        self::export_logs_csv($days);
+        // Ensure script ends after output
         exit;
     }
 
@@ -431,6 +477,19 @@ class PCN_Settings {
         wp_send_json_success($result);
     }
 
+    public static function ajax_load_debug_logs() {
+        if (! current_user_can('manage_options')) {
+            wp_send_json_error('permission');
+        }
+        // optional nonce check when provided
+        if (isset($_REQUEST['nonce'])) {
+            check_ajax_referer('pcn_test_smtp', 'nonce');
+        }
+        $logs = get_option('pcn_debug_log', array());
+        if (! is_array($logs)) { $logs = array(); }
+        wp_send_json_success(array('logs' => $logs));
+    }
+
     public static function ajax_refresh_logs() {
         if (! current_user_can('manage_options')) {
             wp_send_json_error('permission');
@@ -499,6 +558,13 @@ class PCN_Settings {
             }
             $extra['logs'] = $rows_resp['rows'];
             ob_end_clean();
+        }
+
+        // If this was a SMTP test submit, include debug logs so client can display them
+        if (isset($_POST['pcn_test_smtp'])) {
+            $dbg = get_option('pcn_debug_log', array());
+            if (! is_array($dbg)) { $dbg = array(); }
+            $extra['debug_logs'] = $dbg;
         }
 
         wp_send_json_success(array('html' => $html, 'extra' => $extra));

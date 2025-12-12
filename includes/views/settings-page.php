@@ -386,18 +386,16 @@
             </table>
             <p class="submit">
                 <input type="submit" name="pcn_test_smtp" class="button" value="<?php esc_attr_e('发送测试邮件', 'wp-comment-notify'); ?>" />
-                <input type="submit" name="pcn_clear_debug_logs" class="button" value="<?php esc_attr_e('清空调试日志', 'wp-comment-notify'); ?>" />
             </p>
         
 
-        <?php if (! empty($debug_logs)): ?>
-            <h3><?php _e('SMTP 调试日志', 'wp-comment-notify'); ?></h3>
-            <pre style="max-height:300px;overflow:auto;background:#f7f7f7;padding:10px;border:1px solid #ddd;"><?php
-                foreach ($debug_logs as $line) {
-                    echo esc_html($line) . "\n";
-                }
-            ?></pre>
-        <?php endif; ?>
+        <h3><?php _e('SMTP 调试日志', 'wp-comment-notify'); ?></h3>
+        <p>
+            <button type="button" id="pcn-load-debug-logs" class="button"><?php esc_html_e('加载调试日志', 'wp-comment-notify'); ?></button>
+            <input type="submit" name="pcn_clear_debug_logs" class="button" value="<?php esc_attr_e('清空调试日志', 'wp-comment-notify'); ?>" />
+            <span class="description"><?php _e('发送测试邮件后会自动加载最新的调试日志。', 'wp-comment-notify'); ?></span>
+        </p>
+        <pre id="pcn-debug-logs" style="display:none;max-height:300px;overflow:auto;background:#f7f7f7;padding:10px;border:1px solid #ddd;"></pre>
     </div> <!-- End tab-test -->
 
     <div id="tab-logs" class="pcn-tab-content">
@@ -459,11 +457,39 @@
         jQuery(function($){
             var ajaxurl = '<?php echo admin_url('admin-ajax.php'); ?>';
             var $form = $('.pcn-wrap > form');
+            // Load debug logs button
+            $('#pcn-load-debug-logs').on('click', function(){
+                var $btn = $(this).prop('disabled', true);
+                var nonce = ($('[name="pcn_test_smtp_nonce"]').length) ? $('[name="pcn_test_smtp_nonce"]').val() : '';
+                $.post(ajaxurl, { action: 'pcn_load_debug_logs', nonce: nonce }, function(res){
+                    $btn.prop('disabled', false);
+                    if (res.success) {
+                        var logs = res.data.logs || [];
+                        $('#pcn-debug-logs').text(logs.join('\n')).show();
+                    } else {
+                        alert('<?php echo esc_js(__('加载失败', 'wp-comment-notify')); ?>');
+                    }
+                }, 'json').fail(function(){ $btn.prop('disabled', false); alert('<?php echo esc_js(__('请求失败', 'wp-comment-notify')); ?>'); });
+            });
+            // Ensure an invisible iframe exists for background CSV download
+            if (!$('#pcn-export-iframe').length) {
+                $('<iframe id="pcn-export-iframe" name="pcn-export-iframe" style="display:none"></iframe>').appendTo('body');
+            }
+            // When export button is clicked, submit the form targeting the hidden iframe
+            $form.on('click', 'input[name="pcn_export_logs"]', function(){
+                var originalAction = $form.attr('action') || '';
+                // Post to admin-post to return a downloadable CSV
+                $form.attr('action', '<?php echo esc_js(admin_url('admin-post.php')); ?>?action=pcn_export_logs');
+                $form.attr('target', 'pcn-export-iframe');
+                // Restore original action/target shortly after
+                setTimeout(function(){ $form.removeAttr('target'); if (originalAction) { $form.attr('action', originalAction); } else { $form.removeAttr('action'); } }, 3000);
+            });
             // Intercept clicks only on submit buttons inside main form
             $form.on('click', 'input[type=submit], button[type=submit]', function(e){
                 var $btn = $(this);
                 // let dedicated handlers run (diagnostics, queue refresh, logs refresh)
-                if ($btn.is('#pcn-run-diagnostics') || $btn.is('#pcn-refresh-queue') || $btn.is('#pcn-refresh-logs-ajax')) {
+                // Also allow the Export CSV submit to perform a normal form submit (returns a CSV response)
+                if ($btn.is('#pcn-run-diagnostics') || $btn.is('#pcn-refresh-queue') || $btn.is('#pcn-refresh-logs-ajax') || $btn.attr('name') === 'pcn_export_logs') {
                     return;
                 }
                 e.preventDefault();
@@ -507,6 +533,11 @@
                                 });
                             }
                             $('#pcn-logs-table tbody').html(html);
+                        }
+                        // If server returned debug logs (e.g., after test email), show them
+                        if (resp.data.extra && resp.data.extra.debug_logs) {
+                            var dbg = resp.data.extra.debug_logs || [];
+                            $('#pcn-debug-logs').text(dbg.join('\n')).show();
                         }
                     } else {
                         alert('<?php echo esc_js(__('请求失败', 'wp-comment-notify')); ?>');
