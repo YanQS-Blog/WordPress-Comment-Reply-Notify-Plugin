@@ -16,6 +16,8 @@ class PCN_Settings {
         add_action('wp_ajax_pcn_load_debug_logs', array(__CLASS__, 'ajax_load_debug_logs'));
         // AJAX clear debug logs
         add_action('wp_ajax_pcn_clear_debug_logs', array(__CLASS__, 'ajax_clear_debug_logs'));
+        // AJAX get stats for dashboard
+        add_action('wp_ajax_pcn_get_stats', array(__CLASS__, 'ajax_get_stats'));
         // Generic AJAX form submit for settings page
         add_action('wp_ajax_pcn_ajax_form', array(__CLASS__, 'ajax_handle_form'));
         // Handle CSV export via admin-post to allow direct download in iframe
@@ -499,6 +501,102 @@ class PCN_Settings {
         check_ajax_referer('pcn_test_smtp', 'nonce');
         delete_option('pcn_debug_log');
         wp_send_json_success(array('msg' => __('已清空 SMTP 调试日志。', 'wp-comment-notify')));
+    }
+
+    public static function ajax_get_stats() {
+        if (! current_user_can('manage_options')) {
+            wp_send_json_error('permission');
+        }
+        // optional nonce check
+        if (isset($_REQUEST['nonce'])) {
+            check_ajax_referer('pcn_stats', 'nonce');
+        }
+        $days = isset($_REQUEST['days']) ? max(1, intval($_REQUEST['days'])) : 7;
+        $force = ! empty($_REQUEST['force']);
+
+        // Cache key per-days
+        $cache_key = 'pcn_stats_' . intval($days);
+        if (! $force) {
+            $cached = get_transient($cache_key);
+            if ($cached !== false) {
+                wp_send_json_success($cached);
+            }
+        }
+        global $wpdb;
+        $table = $wpdb->prefix . 'pcn_email_logs';
+
+        $labels = array();
+        $success_series = array();
+        $failure_series = array();
+        // prepare last N days labels (local dates)
+        for ($i = $days - 1; $i >= 0; $i--) {
+            $d = gmdate('Y-m-d', time() - $i * 86400);
+            $labels[] = $d;
+            $success_series[$d] = 0;
+            $failure_series[$d] = 0;
+        }
+
+        // Check if DB table exists
+        $check = $wpdb->get_results($wpdb->prepare("SHOW TABLES LIKE %s", $wpdb->esc_like($table)));
+        $totals = array('success' => 0, 'failure' => 0);
+        if (! empty($check)) {
+            // totals
+            $row = $wpdb->get_row("SELECT SUM(CASE WHEN status='success' THEN 1 ELSE 0 END) AS s, SUM(CASE WHEN status='failure' THEN 1 ELSE 0 END) AS f FROM {$table}");
+            if ($row) {
+                $totals['success'] = intval($row->s);
+                $totals['failure'] = intval($row->f);
+            }
+            // per-day
+            $since = gmdate('Y-m-d 00:00:00', time() - ($days - 1) * 86400);
+            $sql = $wpdb->prepare("SELECT DATE(time) AS d, SUM(CASE WHEN status='success' THEN 1 ELSE 0 END) AS s, SUM(CASE WHEN status='failure' THEN 1 ELSE 0 END) AS f FROM {$table} WHERE time >= %s GROUP BY DATE(time)", $since);
+            $rows = $wpdb->get_results($sql);
+            if ($rows) {
+                foreach ($rows as $r) {
+                    $d = $r->d;
+                    if (isset($success_series[$d])) {
+                        $success_series[$d] = intval($r->s);
+                        $failure_series[$d] = intval($r->f);
+                    }
+                }
+            }
+        } else {
+            // fallback to option logs
+            $opt = get_option('pcn_email_logs', array());
+            if (is_array($opt)) {
+                foreach ($opt as $entry) {
+                    $time = isset($entry['time']) ? $entry['time'] : '';
+                    $d = $time ? date('Y-m-d', strtotime($time)) : '';
+                    if ($d && isset($success_series[$d])) {
+                        if (isset($entry['status']) && $entry['status'] === 'success') {
+                            $success_series[$d]++;
+                            $totals['success']++;
+                        } else {
+                            $failure_series[$d]++;
+                            $totals['failure']++;
+                        }
+                    }
+                }
+            }
+        }
+
+        // Unsubscribe counts
+        $unsub_list = get_option('pcn_unsubscribe_list', array());
+        $unsub_actions = get_option('pcn_unsubscribe_actions', array());
+        $unsub_count = 0;
+        if (is_array($unsub_list)) { $unsub_count = count($unsub_list); }
+        // fallback: count successful unsubscribe actions
+        if ($unsub_count === 0 && is_array($unsub_actions)) {
+            foreach ($unsub_actions as $a) { if (! empty($a['success'])) { $unsub_count++; } }
+        }
+
+        // prepare series arrays aligned with labels
+        $sdata = array(); $fdata = array();
+        foreach ($labels as $d) { $sdata[] = $success_series[$d]; $fdata[] = $failure_series[$d]; }
+
+        $result = array('totals' => $totals, 'labels' => $labels, 'success' => $sdata, 'failure' => $fdata, 'unsubscribes' => $unsub_count);
+        // cache for short period to reduce DB pressure
+        set_transient($cache_key, $result, 5 * MINUTE_IN_SECONDS);
+        wp_send_json_success($result);
     }
 
     public static function ajax_refresh_logs() {

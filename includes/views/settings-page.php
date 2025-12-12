@@ -112,6 +112,34 @@
 
         <div id="tab-general" class="pcn-tab-content active">
         <h2><?php _e('插件总开关', 'wp-comment-notify'); ?></h2>
+        <div class="pcn-card" id="pcn-dashboard">
+            <h3><?php _e('仪表盘与统计', 'wp-comment-notify'); ?></h3>
+            <div style="display:flex;gap:16px;margin-bottom:12px;align-items:center;">
+                <div style="flex:0 0 160px;padding:12px;border:1px solid #e1e1e1;border-radius:6px;background:#fff;">
+                    <div style="font-size:12px;color:#666"><?php _e('已发送（成功）', 'wp-comment-notify'); ?></div>
+                    <div id="pcn-total-success" style="font-size:20px;font-weight:700;margin-top:6px;">—</div>
+                </div>
+                <div style="flex:0 0 160px;padding:12px;border:1px solid #e1e1e1;border-radius:6px;background:#fff;">
+                    <div style="font-size:12px;color:#666"><?php _e('发送失败', 'wp-comment-notify'); ?></div>
+                    <div id="pcn-total-failure" style="font-size:20px;font-weight:700;margin-top:6px;color:#c0392b;">—</div>
+                </div>
+                <div style="flex:0 0 160px;padding:12px;border:1px solid #e1e1e1;border-radius:6px;background:#fff;">
+                    <div style="font-size:12px;color:#666"><?php _e('退订数', 'wp-comment-notify'); ?></div>
+                    <div id="pcn-total-unsub" style="font-size:20px;font-weight:700;margin-top:6px;color:#666;">—</div>
+                </div>
+                <div style="margin-left:auto;display:flex;gap:8px;align-items:center;">
+                    <select id="pcn-stats-days" style="padding:6px;border:1px solid #ccc;border-radius:4px;">
+                        <option value="7">7 <?php _e('天', 'wp-comment-notify'); ?></option>
+                        <option value="14">14 <?php _e('天', 'wp-comment-notify'); ?></option>
+                        <option value="30">30 <?php _e('天', 'wp-comment-notify'); ?></option>
+                    </select>
+                    <button type="button" id="pcn-refresh-stats" class="button"><?php esc_html_e('刷新', 'wp-comment-notify'); ?></button>
+                </div>
+            </div>
+            <div>
+                <canvas id="pcn-stats-chart" width="800" height="200" style="max-width:100%;height:200px;"></canvas>
+            </div>
+        </div>
         <table class="form-table">
             <tr>
                 <th scope="row"><?php _e('启用插件功能', 'wp-comment-notify'); ?></th>
@@ -456,6 +484,7 @@
         <script>
         jQuery(function($){
             var ajaxurl = '<?php echo admin_url('admin-ajax.php'); ?>';
+            var statsNonce = '<?php echo esc_js(wp_create_nonce('pcn_stats')); ?>';
             var $form = $('.pcn-wrap > form');
             // Load debug logs button
             $('#pcn-load-debug-logs').on('click', function(){
@@ -563,6 +592,50 @@
                         alert('<?php echo esc_js(__('请求失败', 'wp-comment-notify')); ?>');
                     });
             });
+
+            // Dashboard: load stats and render chart
+            function loadStats(days) {
+                days = days || parseInt($('#pcn-stats-days').val()) || 7;
+                $.post(ajaxurl, { action: 'pcn_get_stats', days: days, nonce: statsNonce }, function(res){
+                    if (! res.success) { return; }
+                    var d = res.data;
+                    $('#pcn-total-success').text(d.totals.success);
+                    $('#pcn-total-failure').text(d.totals.failure);
+                    $('#pcn-total-unsub').text(d.unsubscribes);
+                    renderStatsChart(d.labels, d.success, d.failure);
+                }, 'json');
+            }
+
+            function renderStatsChart(labels, successData, failureData) {
+                // load Chart.js if not present
+                function doRender() {
+                    var ctx = document.getElementById('pcn-stats-chart').getContext('2d');
+                    if (window._pcn_stats_chart) { window._pcn_stats_chart.destroy(); }
+                    window._pcn_stats_chart = new Chart(ctx, {
+                        type: 'line',
+                        data: {
+                            labels: labels,
+                            datasets: [
+                                { label: '<?php echo esc_js(__('成功', 'wp-comment-notify')); ?>', data: successData, borderColor: 'green', backgroundColor: 'rgba(0,128,0,0.08)', fill: true },
+                                { label: '<?php echo esc_js(__('失败', 'wp-comment-notify')); ?>', data: failureData, borderColor: 'red', backgroundColor: 'rgba(255,0,0,0.06)', fill: true }
+                            ]
+                        },
+                        options: { responsive: true, maintainAspectRatio: false }
+                    });
+                }
+                if (typeof Chart === 'undefined') {
+                    var s = document.createElement('script');
+                    s.src = 'https://cdn.jsdelivr.net/npm/chart.js';
+                    s.onload = doRender;
+                    document.head.appendChild(s);
+                } else {
+                    doRender();
+                }
+            }
+
+            // init dashboard
+            $('#pcn-refresh-stats').on('click', function(){ loadStats(); });
+            loadStats();
         });
         </script>
     </form>
