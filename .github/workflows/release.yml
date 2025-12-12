@@ -22,7 +22,8 @@ jobs:
           mkdir -p release
           # Prepare list of tracked files, excluding tests and development files
           git ls-files > all_files.txt
-          grep -Ev '^(composer.json$|phpunit.xml$|README.md$|README.en_US.md$|smtp_test.php$|.github/)' all_files.txt > files_to_zip.txt
+          # Exclude development files and directories (tests, .github, composer, phpunit, readmes, smtp_test)
+          grep -Ev '^(composer.json$|phpunit.xml$|README.md$|README.en_US.md$|smtp_test.php$|.github/|tests/)' all_files.txt > files_to_zip.txt
           # Create zip from filtered file list
           if [ -s files_to_zip.txt ]; then
             zip -r "release/${ZIPNAME}" -@ < files_to_zip.txt
