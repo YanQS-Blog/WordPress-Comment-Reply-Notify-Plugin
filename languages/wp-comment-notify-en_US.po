@@ -143,8 +143,8 @@ msgstr "Login Mechanism"
 msgid "自动协商"
 msgstr "Auto Negotiate"
 
-msgid "编辑 HTML 模板。系统会尝试将更改写入插件的 `templates/` 目录（需可写）。如果写入失败，模板会保存到数据库选项 `pcn_templates`。"
-msgstr "Edit HTML templates. System will try to write changes to `templates/` directory (must be writable). If failed, templates will be saved to database option `pcn_templates`."
+msgid "编辑 HTML 模板。系统会尝试将更改写入插件的 `includes/templates/` 目录（需可写）。如果写入失败，模板会保存到数据库选项 `pcn_templates`。"
+msgstr "Edit HTML templates. System will try to write changes to `includes/templates/` directory (must be writable). If failed, templates will be saved to database option `pcn_templates`."
 
 msgid "回复通知模板 (reply)"
 msgstr "Reply Notification Template (reply)"
