@@ -634,8 +634,8 @@
             }
 
             // init dashboard
-            $('#pcn-refresh-stats').on('click', function(){ loadStats(); });
-            loadStats();
+            $('#pcn-refresh-stats').on('click', function(){ loadStats(true); });
+            loadStats(false);
         });
         </script>
     </form>
