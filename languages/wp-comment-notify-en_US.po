@@ -242,3 +242,21 @@ msgstr "Clear Credentials"
 msgid "确定要清除所有已保存的敏感凭据吗？推荐通过环境变量提供凭据。"
 msgstr "Are you sure you want to clear all saved sensitive credentials? It's recommended to provide credentials via environment variables."
 
+msgid "运行 SMTP 诊断"
+msgstr "Run SMTP Diagnostics"
+
+msgid "运行中..."
+msgstr "Running..."
+
+msgid "诊断失败"
+msgstr "Diagnostics failed"
+
+msgid "请求失败"
+msgstr "Request failed"
+
+msgid "刷新中..."
+msgstr "Refreshing..."
+
+msgid "刷新队列状态"
+msgstr "Refresh queue status"
+

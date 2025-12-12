@@ -12,6 +12,8 @@ class PCN_Settings {
         add_action('wp_ajax_pcn_run_diagnostics', array(__CLASS__, 'ajax_run_diagnostics'));
         // AJAX refresh logs
         add_action('wp_ajax_pcn_refresh_logs', array(__CLASS__, 'ajax_refresh_logs'));
+        // Generic AJAX form submit for settings page
+        add_action('wp_ajax_pcn_ajax_form', array(__CLASS__, 'ajax_handle_form'));
     }
 
     public static function add_admin_menu() {
@@ -458,6 +460,44 @@ class PCN_Settings {
         }
 
         wp_send_json_success(array('rows' => $rows));
+    }
+
+    public static function ajax_handle_form() {
+        if (! current_user_can('manage_options')) {
+            wp_send_json_error('permission');
+        }
+
+        // Capture any output produced by handle_actions
+        ob_start();
+        self::handle_actions();
+        $html = ob_get_clean();
+
+        // Optionally return also refreshed snippets (logs table) by invoking ajax_refresh_logs if requested
+        $extra = array();
+        if (isset($_POST['pcn_refresh_logs']) || isset($_POST['pcn_show_logs']) || isset($_POST['pcn_export_logs'])) {
+            // provide current logs snapshot
+            ob_start();
+            // reuse ajax_refresh_logs to get rows
+            $rows_resp = array('rows' => array());
+            global $wpdb;
+            $table = $wpdb->prefix . 'pcn_email_logs';
+            $n = isset($_POST['pcn_logs_n']) ? intval($_POST['pcn_logs_n']) : 50;
+            $n = max(1, min(500, $n));
+            $check = $wpdb->get_results($wpdb->prepare("SHOW TABLES LIKE %s", $wpdb->esc_like($table)));
+            if (! empty($check)) {
+                $rows = $wpdb->get_results($wpdb->prepare("SELECT time, `to`, subject, status, error FROM {$table} ORDER BY time DESC LIMIT %d", $n), ARRAY_A);
+                $rows_resp['rows'] = $rows;
+            } else {
+                $opt = get_option('pcn_email_logs', array());
+                if (is_array($opt)) {
+                    $rows_resp['rows'] = array_slice($opt, 0, $n);
+                }
+            }
+            $extra['logs'] = $rows_resp['rows'];
+            ob_end_clean();
+        }
+
+        wp_send_json_success(array('html' => $html, 'extra' => $extra));
     }
 
     private static function save_settings() {

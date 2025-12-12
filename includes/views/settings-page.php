@@ -108,6 +108,7 @@
 
     <form method="post">
         <?php wp_nonce_field('pcn_save_settings'); ?>
+        <div id="pcn-ajax-result"></div>
 
         <div id="tab-general" class="pcn-tab-content active">
         <h2><?php _e('插件总开关', 'wp-comment-notify'); ?></h2>
@@ -227,7 +228,7 @@
                 <?php wp_nonce_field('pcn_clear_credentials', 'pcn_clear_credentials_nonce'); ?>
             </p>
             <p style="margin-top:8px;">
-                <button type="button" class="button button-secondary" id="pcn-run-diagnostics"><?php _e('Run SMTP Diagnostics', 'wp-comment-notify'); ?></button>
+                <button type="button" class="button button-secondary" id="pcn-run-diagnostics"><?php _e('运行 SMTP 诊断', 'wp-comment-notify'); ?></button>
             </p>
             <div id="pcn-diagnostics-result" style="margin-top:8px;color:#444"></div>
             <h3 style="margin-top:20px;"><?php _e('邮件队列设置', 'wp-comment-notify'); ?></h3>
@@ -289,7 +290,7 @@
                             if (res.success) {
                                 renderActions(res.data.recent_actions);
                             } else {
-                                alert('Error');
+                                alert('<?php echo esc_js(__('错误', 'wp-comment-notify')); ?>');
                             }
                         });
                     });
@@ -302,7 +303,7 @@
                                 renderActions(res.data.recent_actions);
                                 alert('<?php echo esc_js( __( '队列已处理，已更新记录。', 'wp-comment-notify' ) ); ?>');
                             } else {
-                                alert('Error');
+                                alert('<?php echo esc_js(__('错误', 'wp-comment-notify')); ?>');
                             }
                         });
                     });
@@ -325,10 +326,10 @@
             jQuery(function($){
                 $('#pcn-run-diagnostics').on('click', function(e){
                     e.preventDefault();
-                    var $btn = $(this).prop('disabled', true).text('<?php echo esc_js(__('Running...', 'wp-comment-notify')); ?>');
+                    var $btn = $(this).prop('disabled', true).text('<?php echo esc_js(__('运行中...', 'wp-comment-notify')); ?>');
                     var nonce = '<?php echo esc_js(wp_create_nonce('pcn_diagnostics')); ?>';
                     $.post(ajaxurl, { action: 'pcn_run_diagnostics', nonce: nonce }, function(resp){
-                        $btn.prop('disabled', false).text('<?php echo esc_js(__('Run SMTP Diagnostics', 'wp-comment-notify')); ?>');
+                        $btn.prop('disabled', false).text('<?php echo esc_js(__('运行 SMTP 诊断', 'wp-comment-notify')); ?>');
                         if (resp.success) {
                             var r = resp.data;
                             var html = [];
@@ -341,11 +342,11 @@
                             }
                             $('#pcn-diagnostics-result').html(html.join(''));
                         } else {
-                            $('#pcn-diagnostics-result').text('Diagnostics failed');
+                            $('#pcn-diagnostics-result').text('<?php echo esc_js(__('诊断失败', 'wp-comment-notify')); ?>');
                         }
                     }, 'json').fail(function(){
-                        $btn.prop('disabled', false).text('<?php echo esc_js(__('Run SMTP Diagnostics', 'wp-comment-notify')); ?>');
-                        $('#pcn-diagnostics-result').text('Request failed');
+                        $btn.prop('disabled', false).text('<?php echo esc_js(__('运行 SMTP 诊断', 'wp-comment-notify')); ?>');
+                        $('#pcn-diagnostics-result').text('<?php echo esc_js(__('请求失败', 'wp-comment-notify')); ?>');
                     });
                 });
             });
@@ -421,7 +422,6 @@
                 <input type="number" name="pcn_retention_days" value="90" class="small-text" />
                 <input type="submit" name="pcn_set_retention" class="button" value="<?php esc_attr_e('应用保留策略', 'wp-comment-notify'); ?>" />
             </p>
-        </form>
         <table class="widefat fixed striped" id="pcn-logs-table">
             <thead>
                 <tr>
@@ -457,19 +457,74 @@
             </tbody>
         </table>
         <script>
+        jQuery(function($){
+            var ajaxurl = '<?php echo admin_url('admin-ajax.php'); ?>';
+            var $form = $('.pcn-wrap > form');
+            // Intercept submit/clicks on buttons inside main form
+            $form.on('click', 'input[type=submit], button[type=submit], button', function(e){
+                var $btn = $(this);
+                // let dedicated handlers run (diagnostics, queue refresh, logs refresh)
+                if ($btn.is('#pcn-run-diagnostics') || $btn.is('#pcn-refresh-queue') || $btn.is('#pcn-refresh-logs-ajax')) {
+                    return;
+                }
+                e.preventDefault();
+                var data = $form.serializeArray();
+                if ($btn.attr('name')) {
+                    data.push({ name: $btn.attr('name'), value: $btn.val() });
+                } else if ($btn.attr('id')) {
+                    data.push({ name: $btn.attr('id'), value: $btn.text() });
+                }
+                data.push({ name: 'action', value: 'pcn_ajax_form' });
+
+                $btn.prop('disabled', true);
+                $.post(ajaxurl, data, function(resp){
+                    $btn.prop('disabled', false);
+                    if (resp.success) {
+                        if (resp.data.html) {
+                            $('#pcn-ajax-result').html(resp.data.html);
+                        }
+                        if (resp.data.extra && resp.data.extra.logs) {
+                            var rows = resp.data.extra.logs;
+                            var html = '';
+                            if (!rows || rows.length === 0) {
+                                html = '<tr><td colspan="5"><?php echo esc_js(__('暂无记录。', 'wp-comment-notify')); ?></td></tr>';
+                            } else {
+                                rows.forEach(function(r){
+                                    html += '<tr>';
+                                    html += '<td>' + (r.time || '') + '</td>';
+                                    html += '<td>' + $('<div/>').text(r.to || '').html() + '</td>';
+                                    html += '<td>' + $('<div/>').text(r.subject || '').html() + '</td>';
+                                    html += '<td>' + (r.status === 'success' ? '<span style="color:green;">' + '<?php echo esc_js(__("成功", "wp-comment-notify")); ?>' + '</span>' : '<span style="color:red;">' + '<?php echo esc_js(__("失败", "wp-comment-notify")); ?>' + '</span>') + '</td>';
+                                    html += '<td>' + $('<div/>').text(r.error || '').html() + '</td>';
+                                    html += '</tr>';
+                                });
+                            }
+                            $('#pcn-logs-table tbody').html(html);
+                        }
+                    } else {
+                        alert('<?php echo esc_js(__('请求失败', 'wp-comment-notify')); ?>');
+                    }
+                    }, 'json').fail(function(){
+                        $btn.prop('disabled', false);
+                        alert('<?php echo esc_js(__('请求失败', 'wp-comment-notify')); ?>');
+                    });
+            });
+        });
+        </script>
+        <script>
             jQuery(function($){
                 var ajaxurl = '<?php echo admin_url('admin-ajax.php'); ?>';
                 $('#pcn-refresh-logs-ajax').on('click', function(){
                     var n = parseInt($('#pcn_logs_n').val()) || 50;
                     var nonce = '<?php echo esc_js(wp_create_nonce('pcn_show_logs')); ?>';
-                    var $btn = $(this).prop('disabled', true).text('<?php echo esc_js(__('Refreshing...', 'wp-comment-notify')); ?>');
+                    var $btn = $(this).prop('disabled', true).text('<?php echo esc_js(__('刷新中...', 'wp-comment-notify')); ?>');
                     $.post(ajaxurl, { action: 'pcn_refresh_logs', nonce: nonce, n: n }, function(resp){
-                        $btn.prop('disabled', false).text('<?php echo esc_js(__('AJAX 刷新', 'wp-comment-notify')); ?>');
+                        $btn.prop('disabled', false).text('<?php echo esc_js(__('刷新', 'wp-comment-notify')); ?>');
                         if (resp.success) {
                             var rows = resp.data.rows || [];
                             var html = '';
                             if (rows.length === 0) {
-                                html = '<tr><td colspan="5><?php echo esc_js(__('暂无记录。', 'wp-comment-notify')); ?></td></tr>';
+                                html = '<tr><td colspan="5"><?php echo esc_js(__('暂无记录。', 'wp-comment-notify')); ?></td></tr>';
                             } else {
                                 rows.forEach(function(r){
                                     html += '<tr>';
@@ -483,11 +538,11 @@
                             }
                             $('#pcn-logs-table tbody').html(html);
                         } else {
-                            alert('Refresh failed');
+                            alert('<?php echo esc_js(__('刷新失败', 'wp-comment-notify')); ?>');
                         }
                     }, 'json').fail(function(){
-                        $btn.prop('disabled', false).text('<?php echo esc_js(__('AJAX 刷新', 'wp-comment-notify')); ?>');
-                        alert('Request failed');
+                        $btn.prop('disabled', false).text('<?php echo esc_js(__('刷新', 'wp-comment-notify')); ?>');
+                        alert('<?php echo esc_js(__('请求失败', 'wp-comment-notify')); ?>');
                     });
                 });
             });
