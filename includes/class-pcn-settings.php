@@ -175,7 +175,8 @@ class PCN_Settings {
             $subject = __('WP Comment Notify SMTP 测试', 'wp-comment-notify');
             $message = '<p>' . __('这是一封测试邮件，用于验证当前 SMTP/TLS/OAuth 配置是否可用。', 'wp-comment-notify') . '</p>';
             
-            add_filter('wp_mail_content_type', array(__CLASS__, 'admin_html_content_type'));
+            // Use mailer's content-type helper to avoid duplicate functions
+            add_filter('wp_mail_content_type', array('PCN_Mailer', 'set_html_content_type'));
             add_action('phpmailer_init', array(__CLASS__, 'admin_debug_hook'), PHP_INT_MAX);
 
             $ok = wp_mail($test_to, $subject, $message);
@@ -189,7 +190,7 @@ class PCN_Settings {
                 }
             }
 
-            remove_filter('wp_mail_content_type', array(__CLASS__, 'admin_html_content_type'));
+            remove_filter('wp_mail_content_type', array('PCN_Mailer', 'set_html_content_type'));
             remove_action('phpmailer_init', array(__CLASS__, 'admin_debug_hook'));
 
             if ($ok) {
@@ -988,9 +989,7 @@ class PCN_Settings {
         return '';
     }
 
-    public static function admin_html_content_type() {
-        return 'text/html';
-    }
+    // Content-type helper removed; use PCN_Mailer::set_html_content_type() instead
 
     public static function admin_debug_hook($phpmailer) {
         $phpmailer->SMTPDebug = 2;
