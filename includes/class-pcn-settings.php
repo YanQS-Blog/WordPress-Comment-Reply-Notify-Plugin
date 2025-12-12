@@ -216,6 +216,10 @@ class PCN_Settings {
                 );
                 self::debug_log_append('[settings-snapshot] ' . wp_json_encode($safeSnap));
             }
+            // Record this test email attempt into the email logs (DB or option fallback)
+            if (class_exists('PCN_Mailer') && method_exists('PCN_Mailer', 'log_email_attempt')) {
+                PCN_Mailer::log_email_attempt($test_to, $subject, (bool) $ok, $err);
+            }
         } else {
             echo '<div class="error"><p>' . __('请填写有效的测试收件人邮箱。', 'wp-comment-notify') . '</p></div>';
         }

@@ -374,7 +374,6 @@
         <div class="pcn-submit-bar">
             <input type="submit" name="pcn_save_settings" id="submit" class="button button-primary button-hero" value="<?php esc_attr_e('保存所有设置', 'wp-comment-notify'); ?>" />
         </div>
-    </form>
 
     <div id="tab-test" class="pcn-tab-content">
         <h2><?php _e('SMTP 测试', 'wp-comment-notify'); ?></h2>
@@ -519,6 +518,7 @@
             });
         });
         </script>
+    </form>
         <script>
             jQuery(function($){
                 var ajaxurl = '<?php echo admin_url('admin-ajax.php'); ?>';
