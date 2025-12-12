@@ -825,27 +825,45 @@ class PCN_Settings {
         if (! is_string($data) || $data === '') {
             return '';
         }
+        // If openssl not available, fallback to base64-decoded plaintext
         if (! function_exists('openssl_decrypt')) {
-            // Fallback: assume base64-encoded plaintext
             $decoded = @base64_decode($data, true);
             return $decoded === false ? '' : $decoded;
         }
-        $raw = base64_decode($data, true);
+
+        // Attempt to decode base64 wrapper first
+        $raw = @base64_decode($data, true);
         if ($raw === false) {
+            // not base64 - give up
             return '';
         }
-        $key = hash('sha256', wp_salt('pcn_secret_key'));
-        $ivlen = openssl_cipher_iv_length('AES-256-CBC');
-        if (strlen($raw) <= $ivlen) {
-            return '';
+
+        // Try multiple possible keys/ciphers for compatibility across plugin updates
+        $salt_variants = array('pcn_secret_key', 'pcn_secret', '');
+        $cipher_variants = array('AES-256-CBC', 'AES-128-CBC');
+
+        foreach ($cipher_variants as $cipher) {
+            $ivlen = openssl_cipher_iv_length($cipher);
+            if ($ivlen <= 0) { continue; }
+            if (strlen($raw) <= $ivlen) { continue; }
+            $iv = substr($raw, 0, $ivlen);
+            $cipher_text = substr($raw, $ivlen);
+            foreach ($salt_variants as $salt_name) {
+                $key = hash('sha256', wp_salt($salt_name));
+                $plain = @openssl_decrypt($cipher_text, $cipher, $key, OPENSSL_RAW_DATA, $iv);
+                if ($plain !== false && $plain !== null && $plain !== '') {
+                    return $plain;
+                }
+            }
         }
-        $iv = substr($raw, 0, $ivlen);
-        $cipher = substr($raw, $ivlen);
-        $plain = openssl_decrypt($cipher, 'AES-256-CBC', $key, OPENSSL_RAW_DATA, $iv);
-        if ($plain === false) {
-            return '';
+
+        // Last resort: maybe stored value was simple base64 of plaintext (legacy fallback)
+        $decoded_plain = @base64_decode($data, true);
+        if ($decoded_plain !== false && is_string($decoded_plain) && strlen(trim($decoded_plain)) > 0) {
+            return $decoded_plain;
         }
-        return $plain;
+
+        return '';
     }
 
     public static function admin_html_content_type() {

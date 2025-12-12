@@ -251,7 +251,7 @@
             </tr>
             <p><?php _e('注意：OAuth2 认证仅在部分 SMTP 服务（如 Gmail/Google Workspace）支持，且需要预先在对应平台创建应用并获取相关凭据。SMTP 调试成功后请务必删除主题目录下的 smtp_test.php 文件。', 'wp-comment-notify'); ?></p>
             <p style="margin-top:15px;">
-                <button type="submit" name="pcn_clear_credentials" class="button" onclick="return confirm('<?php echo esc_js( __( '确定要清除所有已保存的敏感凭据吗？推荐通过环境变量提供凭据。', 'wp-comment-notify' ) ); ?>');"><?php esc_html_e('清除凭据', 'wp-comment-notify'); ?></button>
+                <button type="button" id="pcn-clear-credentials-btn" class="button"><?php esc_html_e('清除凭据', 'wp-comment-notify'); ?></button>
                 <?php wp_nonce_field('pcn_clear_credentials', 'pcn_clear_credentials_nonce'); ?>
             </p>
             <p style="margin-top:8px;">
@@ -499,6 +499,16 @@
                     }
                 }, 'json').fail(function(){ $btn.prop('disabled', false); alert('<?php echo esc_js(__('请求失败', 'wp-comment-notify')); ?>'); });
             });
+            // Clear credentials button: confirm then submit with hidden input (prevents Enter key triggering it)
+            $('#pcn-clear-credentials-btn').on('click', function(e){
+                var msg = '<?php echo esc_js( __( '确定要清除所有已保存的敏感凭据吗？推荐通过环境变量提供凭据。', 'wp-comment-notify' ) ); ?>';
+                if (! confirm(msg)) { return; }
+                // ensure hidden input exists
+                if ($('[name="pcn_clear_credentials"]').length === 0) {
+                    $('<input>').attr({ type: 'hidden', name: 'pcn_clear_credentials', value: '1' }).appendTo($form);
+                }
+                $form.submit();
+            });
             // Clear debug logs via AJAX (no page reload)
             $('input[name="pcn_clear_debug_logs"]').on('click', function(e){
                 e.preventDefault();
@@ -635,6 +645,48 @@
             // init dashboard
             $('#pcn-refresh-stats').on('click', function(){ loadStats(true); });
             loadStats(false);
+
+            // Keyboard: Enter key behavior mapping
+            // 1) In SMTP 设置区，回车触发 保存所有设置
+            $(document).on('keydown', '#tab-smtp input[type=text], #tab-smtp input[type=number], #tab-smtp input[type=email], #tab-smtp input[type=password], #tab-smtp select', function(e){
+                if (e.key === 'Enter' || e.keyCode === 13) {
+                    e.preventDefault();
+                    var $save = $('[name="pcn_save_settings"]');
+                    if ($save.length) { $save.first().click(); }
+                }
+            });
+
+            // 2) 在 SMTP 测试的测试邮箱输入框回车触发 发送测试邮件
+            $(document).on('keydown', '#tab-test input[name="test_to"]', function(e){
+                if (e.key === 'Enter' || e.keyCode === 13) {
+                    e.preventDefault();
+                    var $btn = $('[name="pcn_test_smtp"]');
+                    if ($btn.length) { $btn.first().click(); }
+                }
+            });
+
+            // 3) 发送记录页：各输入框回车触发对应右侧按钮
+            // 显示最近 N 条 -> 刷新按钮
+            $(document).on('keydown', '#pcn_logs_n', function(e){
+                if (e.key === 'Enter' || e.keyCode === 13) {
+                    e.preventDefault();
+                    $('#pcn-refresh-logs-ajax').click();
+                }
+            });
+            // 导出最近 N 天 -> 导出 CSV 按钮
+            $(document).on('keydown', 'input[name="pcn_export_days"]', function(e){
+                if (e.key === 'Enter' || e.keyCode === 13) {
+                    e.preventDefault();
+                    $('[name="pcn_export_logs"]').first().click();
+                }
+            });
+            // 保留策略输入 -> 应用保留策略
+            $(document).on('keydown', 'input[name="pcn_retention_days"]', function(e){
+                if (e.key === 'Enter' || e.keyCode === 13) {
+                    e.preventDefault();
+                    $('[name="pcn_set_retention"]').first().click();
+                }
+            });
         });
         </script>
     </form>
