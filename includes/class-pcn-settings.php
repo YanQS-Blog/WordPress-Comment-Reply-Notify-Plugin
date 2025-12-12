@@ -528,9 +528,10 @@ class PCN_Settings {
         $labels = array();
         $success_series = array();
         $failure_series = array();
-        // prepare last N days labels (local dates)
+        // prepare last N days labels using WP local time (respect site timezone)
+        $ts_now = current_time('timestamp');
         for ($i = $days - 1; $i >= 0; $i--) {
-            $d = gmdate('Y-m-d', time() - $i * 86400);
+            $d = date('Y-m-d', $ts_now - $i * 86400);
             $labels[] = $d;
             $success_series[$d] = 0;
             $failure_series[$d] = 0;
@@ -547,7 +548,8 @@ class PCN_Settings {
                 $totals['failure'] = intval($row->f);
             }
             // per-day
-            $since = gmdate('Y-m-d 00:00:00', time() - ($days - 1) * 86400);
+            // use site-local midnight for the oldest day
+            $since = date('Y-m-d 00:00:00', $ts_now - ($days - 1) * 86400);
             $sql = $wpdb->prepare("SELECT DATE(time) AS d, SUM(CASE WHEN status='success' THEN 1 ELSE 0 END) AS s, SUM(CASE WHEN status='failure' THEN 1 ELSE 0 END) AS f FROM {$table} WHERE time >= %s GROUP BY DATE(time)", $since);
             $rows = $wpdb->get_results($sql);
             if ($rows) {
