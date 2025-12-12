@@ -111,7 +111,6 @@
         <div id="pcn-ajax-result"></div>
 
         <div id="tab-general" class="pcn-tab-content active">
-        <h2><?php _e('插件总开关', 'wp-comment-notify'); ?></h2>
         <div class="pcn-card" id="pcn-dashboard">
             <h3><?php _e('仪表盘与统计', 'wp-comment-notify'); ?></h3>
             <div style="display:flex;gap:16px;margin-bottom:12px;align-items:center;">
