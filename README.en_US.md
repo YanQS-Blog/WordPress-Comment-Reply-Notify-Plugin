@@ -1,6 +1,6 @@
 # Wordpress Comment & Reply Notify Plugin
 
-[中文文档](README.md) | [English Documentation](README.en_US.md) | [中文Wiki](https://github.com/YanQS-Blog/WordPress-Comment-Reply-Notify-Plugin/wiki/Home) ｜ [English Wiki](https://github.com/YanQS-Blog/WordPress-Comment-Reply-Notify-Plugin/wiki/Home.en_US)
+[中文文档](README.md) | [English Documentation](README.en_US.md) | [中文Wiki](https://github.com/YanQS-Blog/WordPress-Comment-Reply-Notify-Plugin/wiki/Home) | [English Wiki](https://github.com/YanQS-Blog/WordPress-Comment-Reply-Notify-Plugin/wiki/Home.en_US)
 
 > English localization is supported now.
 
