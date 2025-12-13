@@ -28,6 +28,8 @@ class PCN_Mailer {
     public static function log_email_attempt($to, $subject, $sent, $error = '') {
         global $wpdb;
         $table = $wpdb->prefix . 'pcn_email_logs';
+        // Ensure table schema and index exist (best-effort)
+        self::ensure_logs_table_schema();
         // Fallback to option storage if table does not exist
         $check = $wpdb->get_results($wpdb->prepare("SHOW TABLES LIKE %s", $wpdb->esc_like($table)));
         $time = current_time('mysql');
@@ -44,16 +46,64 @@ class PCN_Mailer {
                 ),
                 array('%s','%s','%s','%s','%s','%s')
             );
-            // Keep only recent 1000 rows to cap growth (rotation)
-            $wpdb->query("DELETE FROM {$table} WHERE id NOT IN (SELECT id FROM (SELECT id FROM {$table} ORDER BY id DESC LIMIT 1000) x)");
+            // Keep only recent N rows to cap growth (rotation)
+            $max_rows = intval(get_option('pcn_log_table_max', 1000));
+            if ($max_rows > 0) {
+                $wpdb->query($wpdb->prepare("DELETE FROM {$table} WHERE id NOT IN (SELECT id FROM (SELECT id FROM {$table} ORDER BY id DESC LIMIT %d) x)", $max_rows));
+            }
         } else {
             // fallback: keep using option but limit size
             $logs = get_option('pcn_email_logs', array());
             if (! is_array($logs)) { $logs = array(); }
             $log_entry = array('time' => $time, 'to' => $to, 'subject' => $subject, 'status' => $sent ? 'success' : 'failure', 'error' => $error);
             array_unshift($logs, $log_entry);
-            if (count($logs) > 100) { $logs = array_slice($logs, 0, 100); }
+            $opt_limit = intval(get_option('pcn_logs_option_limit', 200));
+            if ($opt_limit <= 0) { $opt_limit = 200; }
+            if (count($logs) > $opt_limit) { $logs = array_slice($logs, 0, $opt_limit); }
             update_option('pcn_email_logs', $logs, false);
+        }
+    }
+
+    // Ensure DB table exists and has appropriate indexes. Best-effort: uses dbDelta when possible.
+    private static function ensure_logs_table_schema() {
+        global $wpdb;
+        $table = $wpdb->prefix . 'pcn_email_logs';
+        // Quick check
+        $check = $wpdb->get_results($wpdb->prepare("SHOW TABLES LIKE %s", $wpdb->esc_like($table)));
+        if (! empty($check)) {
+            // ensure index on time exists (best-effort)
+            $indexes = $wpdb->get_results("SHOW INDEX FROM {$table}", ARRAY_A);
+            $has_time_idx = false;
+            if ($indexes) {
+                foreach ($indexes as $idx) {
+                    if (isset($idx['Column_name']) && $idx['Column_name'] === 'time') { $has_time_idx = true; break; }
+                }
+            }
+            if (! $has_time_idx) {
+                $wpdb->query("ALTER TABLE {$table} ADD INDEX pcn_time_idx (`time`)");
+            }
+            return;
+        }
+
+        // Attempt to create table using dbDelta if available
+        $charset_collate = $wpdb->get_charset_collate();
+        $sql = "CREATE TABLE {$table} (
+            id bigint(20) unsigned NOT NULL AUTO_INCREMENT,
+            `time` datetime NOT NULL,
+            `to` varchar(255) DEFAULT '',
+            subject text,
+            status varchar(20) DEFAULT '',
+            error text,
+            meta longtext,
+            PRIMARY KEY  (id),
+            KEY pcn_time_idx (`time`)
+        ) $charset_collate;";
+        if (function_exists('dbDelta')) {
+            require_once(ABSPATH . 'wp-admin/includes/upgrade.php');
+            dbDelta($sql);
+        } else {
+            // fallback: try direct query
+            $wpdb->query($sql);
         }
     }
 

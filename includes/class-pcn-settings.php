@@ -42,6 +42,9 @@ class PCN_Settings {
         register_setting('pcn_settings_group', 'pcn_smtp_settings');
         register_setting('pcn_settings_group', 'pcn_templates');
         register_setting('pcn_settings_group', 'pcn_enabled');
+        // log limits
+        register_setting('pcn_settings_group', 'pcn_log_table_max');
+        register_setting('pcn_settings_group', 'pcn_logs_option_limit');
     }
 
     public static function render_options_page() {
@@ -77,6 +80,11 @@ class PCN_Settings {
         }
 
         $debug_logs = get_option('pcn_debug_log', array());
+
+        // Enforce configured log limits (prune DB table or option storage to configured caps)
+        if (is_admin() && current_user_can('manage_options')) {
+            self::enforce_log_limits();
+        }
 
         // Enqueue editor scripts so we can initialize TinyMCE on-demand in the view
         // Only call if the function exists (older WP versions may not have it).
@@ -375,6 +383,33 @@ class PCN_Settings {
         }
 
         $wpdb->query($wpdb->prepare("DELETE FROM {$table} WHERE time < %s", $threshold));
+    }
+
+    // Enforce limits on logs to avoid oversized options or tables.
+    public static function enforce_log_limits() {
+        global $wpdb;
+        // Option-based logs cap
+        $opt_limit = intval(get_option('pcn_logs_option_limit', 200));
+        if ($opt_limit > 0) {
+            $opt = get_option('pcn_email_logs', array());
+            if (is_array($opt) && count($opt) > $opt_limit) {
+                $trimmed = array_slice($opt, 0, $opt_limit);
+                update_option('pcn_email_logs', $trimmed, false);
+                self::debug_log_append('[logs-maintenance] trimmed option logs to ' . intval($opt_limit));
+            }
+        }
+
+        // DB table cap
+        $table = $wpdb->prefix . 'pcn_email_logs';
+        $check = $wpdb->get_results($wpdb->prepare("SHOW TABLES LIKE %s", $wpdb->esc_like($table)));
+        if (! empty($check)) {
+            $max_rows = intval(get_option('pcn_log_table_max', 1000));
+            if ($max_rows > 0) {
+                // remove older rows beyond limit
+                $wpdb->query($wpdb->prepare("DELETE FROM {$table} WHERE id NOT IN (SELECT id FROM (SELECT id FROM {$table} ORDER BY id DESC LIMIT %d) x)", $max_rows));
+                self::debug_log_append('[logs-maintenance] ensured DB log rows <= ' . intval($max_rows));
+            }
+        }
     }
 
     public static function ajax_run_diagnostics() {
