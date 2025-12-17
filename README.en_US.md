@@ -1,6 +1,6 @@
 # Wordpress Comment & Reply Notify Plugin
 
-[中文文档](README.md) | [English Documentation](README.en_US.md) | [中文Wiki](https://github.com/YanQS-Blog/WordPress-Comment-Reply-Notify-Plugin/wiki/Home) | [English Wiki](https://github.com/YanQS-Blog/WordPress-Comment-Reply-Notify-Plugin/wiki/Home.en_US)
+[中文文档](README.md) | [English Documentation](README.en_US.md) | [中文Wiki](https://github.com/Yan-QS/WordPress-Comment-Reply-Notify-Plugin/wiki/Home) | [English Wiki](https://github.com/Yan-QS/WordPress-Comment-Reply-Notify-Plugin/wiki/Home.en_US)
 
 > English localization is supported now.
 
@@ -51,7 +51,7 @@ Plugin Homepage: [https://yanqs.me/wp-comment-notify-plugin/](https://yanqs.me/w
 
 ## Installation & Activation
 
-1.  Download the latest release from Releases: https://github.com/YanQS-Blog/WordPress-Comment-Reply-Notify-Plugin/releases
+1.  Download the latest release from Releases: https://github.com/Yan-QS/WordPress-Comment-Reply-Notify-Plugin/releases
 2.  Upload the extracted `wp-comment-notify` folder to the `/wp-content/plugins/` directory of your WordPress site.
 3.  Log in to the WordPress admin panel and go to the "Plugins" page.
 4.  Find "WP Comment & Reply Notify" and click "Activate".

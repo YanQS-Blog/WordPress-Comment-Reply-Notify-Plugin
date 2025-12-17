@@ -1,6 +1,6 @@
 # Wordpress Comment & Reply Notify Plugin
 
-[中文文档](README.md) | [English Documentation](README.en_US.md) | [中文Wiki](https://github.com/YanQS-Blog/WordPress-Comment-Reply-Notify-Plugin/wiki/Home) | [English Wiki](https://github.com/YanQS-Blog/WordPress-Comment-Reply-Notify-Plugin/wiki/Home.en_US)
+[中文文档](README.md) | [English Documentation](README.en_US.md) | [中文Wiki](https://github.com/Yan-QS/WordPress-Comment-Reply-Notify-Plugin/wiki/Home) | [English Wiki](https://github.com/Yan-QS/WordPress-Comment-Reply-Notify-Plugin/wiki/Home.en_US)
 
 ![Plugin.gif](/Plugin.gif)
 
@@ -49,7 +49,7 @@
 
 ## 安装与激活
 
-1.  下载最新版本：参见 Releases 页面 https://github.com/YanQS-Blog/WordPress-Comment-Reply-Notify-Plugin/releases
+1.  下载最新版本：参见 Releases 页面 https://github.com/Yan-QS/WordPress-Comment-Reply-Notify-Plugin/releases
 2.  将整个文件夹上传到 WordPress 站点的 `/wp-content/plugins/` 目录下。
 3.  登录 WordPress 后台，进入“插件”页面。
 4.  找到“WP Comment & Reply Notify”并点击“激活”。
